@@ -5,6 +5,7 @@ var Knex = require('knex');
 var FetchRequestHandler = require('./FetchRequestHandler.js');
 var InsertRequestHandler = require('./InsertRequestHandler.js');
 var TokenHandler = require('./TokenHandler.js');
+var AccountVerification = require('./AccountVerification.js');
 
 var app = express();
 var multer = require('multer');
@@ -15,9 +16,6 @@ var jsonParser = bodyParser.json();
 app.use(jsonParser);
 
 app.enable('trust proxy');
-
-//UNCOMMENT BEFORE DEPLOY
-//process.env.NODE_ENV = 'production';
 
 var knex = Connect()
 
@@ -98,24 +96,6 @@ app.post('/fetch/readings', function (req, res, next) {
 //INSERTS
 
 /**
- * This inserts into MYSQL a new doctor into the doctor table.
- */
-app.post('/insert/doctor', jsonParser, function (req, res, next) {
-	if(!req.is('application/json'))
-		return next();
-    InsertRequestHandler.insertDoctor(knex, req, res);
-});
-
-/**
- *  inserts into MYSQL a new patients int the patient table.
- */
-app.post('/insert/patient', jsonParser, function (req, res, next) {
-	if(!req.is('application/json'))
-		return next();
-    InsertRequestHandler.insertPatient(knex, req, res);
-});
-
-/**
  *  This site processes a post request and inserts patient reading information into the reading table.
  *  example post body: {id:1234, ch1: 1, ch2: 5, ch3: 6, ... , ch64:...}
  */
@@ -157,10 +137,16 @@ app.post('/check/token', jsonParser, function (req, res, next) {
     TokenHandler.checkUserExists(knex, req, res);
 });
 
+//ACCOUNT
+
 app.post('/token/sendEmail', jsonParser, function (req, res, next) {
     if (!req.is('application/json'))
         return next();
-    TokenHandler.sendEmail(req, res);
+    AccountVerification.sendEmail(knex, req, res);
+});
+
+app.get('/validate', function (req, res, next) {
+    AccountVerification.insertVerify(knex, req, res);
 });
 
 /**

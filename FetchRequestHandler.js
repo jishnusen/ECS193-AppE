@@ -14,11 +14,14 @@ function fetchDoctors (knex, req, res)
     knex
         .select()
         .from('faculty')
+        .where(function() {
+            this.where('accType', 'doctor').orWhere('accType', 'adminDoctor')
+        })
         .then(function (results) {
-            var names = results.map((row) => { return row.name; });
+            var emails = results.map((row) => { return row.email; });
             res.status(200)
                 .set('Content-Type', 'text/plain')
-                .send(JSON.stringify(names))
+                .send(JSON.stringify(emails))
                 .end();
         });
 }
@@ -64,7 +67,7 @@ function fetchDoctorPatients (knex, req, res)
     knex
         .select()
         .from('patients')
-        .where('doctor', data.doctor)
+        .where('doctorEmail', data.doctor)
         .then(function (results) {
             var ids = results.map((row) => { return row.id; });
             res.status(200)
@@ -157,5 +160,4 @@ module.exports.fetchDoctors = fetchDoctors;
 module.exports.fetchIDfromEmail = fetchIDfromEmail;
 module.exports.fetchDoctorPatients = fetchDoctorPatients;
 module.exports.fetchReadings = fetchReadings;
-module.exports.fetchDoctorReadings = fetchDoctorReadings;
 module.exports.fetchReadingsSize = fetchReadingsSize;

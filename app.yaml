@@ -9,6 +9,7 @@ resources:
   disk_size_gb: 10
 
 env_variables:
+  NODE_ENV: production
   SQL_USER: huhu
   SQL_PASSWORD: password
   SQL_DATABASE: ecs193_database

@@ -29,7 +29,8 @@
     "mysql": "2.14.1",
     "node-mailjet": "^3.2.1",
     "nodemailer": "^4.6.0",
-    "prompt": "1.0.0"
+    "prompt": "1.0.0",
+    "randomstring": "^1.1.5"
   },
   "devDependencies": {
     "@google-cloud/nodejs-repo-tools": "1.4.17",

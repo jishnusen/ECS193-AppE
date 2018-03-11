@@ -1,6 +1,7 @@
 var process = require('process');
 var express = require('express');
 var Knex = require('knex');
+
 /** A List of all avalible data inserting functions for the MySQL database that are avalible on the AppEngine */
 /**
 *	This function processes the POST request and sends a POST to the SQL database to INSERT patients to the appropriate table as well as generating a unique table for said patient.
@@ -9,16 +10,23 @@ var Knex = require('knex');
 *	@param req  - the POST request
 *   @param res  - the POST response
 **/
-function insertPatient (knex, req, res)
+function insertPatient (knex, data, res)
 {
-	var data = req.body;
-
 	knex('faculty')
-		.where('name', data.doctor)
-		.catch((err) => { console.log(err); })
+		.where('email', data.doctorEmail)
+		.catch((err) => console.log(err))
 		.then(function(rows) {
-			if (rows.length >= 1)
+			if (rows.length > 0)
 			{
+				if (rows[0].accType != 'doctor' && rows[0].accType != 'adminDoctor')
+				{
+					res.status(400)
+						.set('Content-Type', 'text/plain')
+						.send('Doctor does not exist.')
+						.end();
+					return;
+				}
+
 				knex('patients')
 					.insert(data)
 					.catch((err) => { console.log(err); })
@@ -33,7 +41,7 @@ function insertPatient (knex, req, res)
 								knex.schema.
 									createTable(tableName, function(table) {
 										table.dateTime('timestamp').defaultTo(knex.fn.now()).primary();
-										for (var i = 0; i < 4; i++)
+										for (var i = 0; i < 64; i++)
 											table.float('ch' + i).notNullable();
 									})
 									.then(function() {
@@ -43,13 +51,13 @@ function insertPatient (knex, req, res)
 											.end();
 									});
 							});
-					})
+					});
 			}
 			else
 			{
-				res.status(200)
+				res.status(400)
 					.set('Content-Type', 'text/plain')
-					.send('No doctor of name exists.')
+					.send('Doctor does not exist.')
 					.end();
 			}
 		});
@@ -63,24 +71,22 @@ function insertPatient (knex, req, res)
 *	@param req  - the POST request
 *   @param res  - the POST response
 **/
-function insertDoctor (knex, req, res)
+function insertFaculty (knex, data, res)
 {
-	var data = req.body;
-
 	knex('faculty')
-		.where('name', data.name)
+		.where('email', data.email)
 		.catch((err) => { console.log(err); })
 		.then(function(rows) {
 			if (rows.length >= 1)
 			{
-				res.status(200)
+				res.status(400)
 					.set('Content-Type', 'text/plain')
-					.send('Doctor of same name already exists.')
+					.send('Faculty of same name already exists.')
 					.end();
 			}
 			else
 			{
-				knex('doctors')
+				knex('faculty')
 					.insert(data)
 					.catch((err) => { console.log(err); })
 					.then(function() {
@@ -156,5 +162,5 @@ function insertReading (knex, req, res)
 }
 
 module.exports.insertPatient = insertPatient;
-module.exports.insertDoctor = insertDoctor;
+module.exports.insertFaculty = insertFaculty;
 module.exports.insertReading = insertReading;
