@@ -1,19 +1,19 @@
-var process = require('process');
-var express = require('express');
-var Knex = require('knex');
+const process = require('process');
+const express = require('express');
+const Knex = require('knex');
 const https = require('https');
 
-var FetchRequestHandler = require('./FetchRequestHandler.js');
-var InsertRequestHandler = require('./InsertRequestHandler.js');
-var TokenHandler = require('./TokenHandler.js');
-var AccountVerification = require('./AccountVerification.js');
+const FetchRequestHandler = require('./FetchRequestHandler.js');
+const InsertRequestHandler = require('./InsertRequestHandler.js');
+const TokenHandler = require('./TokenHandler.js');
+const AccountVerification = require('./AccountVerification.js');
 
-var app = express();
-var multer = require('multer');
-var upload = multer();
+const app = express();
+const multer = require('multer');
+const upload = multer();
 
-var bodyParser = require('body-parser');
-var jsonParser = bodyParser.json();
+const bodyParser = require('body-parser');
+const jsonParser = bodyParser.json();
 app.use(jsonParser);
 
 app.enable('trust proxy');
@@ -46,13 +46,6 @@ function Connect () //establish connection with database
     return knex;
 }
 
-app.get('/', function (req, res, next) {
-    res.status(404)
-        .set('Content-Type', 'text/plain')
-        .send(' ')
-        .end();
-});
-
 //FETCHES
 /**
 *   This site takes a POST request and returns the list of doctors registered in the database.
@@ -63,14 +56,12 @@ app.post('/fetch/doctors', function (req, res, next) {
         return next();
 
     tokenVerify(callback, res, req);
-    function callback(authorization) //authorization is a JSON with accType and email
+    function callback (authorization) //authorization is a JSON with accType and email
     {
-        if(authorization.accType == 'doctor' || authorization.accType == 'adminDoctor' || authorization.accType == 'admin' ){
+        if (authorization.accType == 'doctor' || authorization.accType == 'adminDoctor' || authorization.accType == 'admin')
             FetchRequestHandler.fetchDoctors(knex, req, res);
-        }
-        else{
-            noAuth401(res);
-        }
+        else
+            serverRespond(res, 401, 'Invalid Credentials');
     }
 });
 
@@ -84,14 +75,12 @@ app.post('/fetch/idFromEmail', function (req, res, next) {
         return next();
 
     tokenVerify(callback, res, req);
-    function callback(authorization)
+    function callback (authorization)
     {
-        if(authorization.accType == 'doctor' || authorization.accType == 'adminDoctor' || authorization.accType == 'admin' ){
+        if (authorization.accType == 'doctor' || authorization.accType == 'adminDoctor' || authorization.accType == 'admin')
             FetchRequestHandler.fetchIDfromEmail(knex, req, res);
-        }
-        else{
-            noAuth401(res);
-        }
+        else
+            serverRespond(res, 401, 'Invalid Credentials');
     }
 });
 
@@ -104,14 +93,12 @@ app.post('/fetch/doctorList', function (req, res, next) {
         return next();
 
     tokenVerify(callback, res, req);
-    function callback(authorization)
+    function callback (authorization)
     {
-        if(authorization.accType == 'doctor' || authorization.accType == 'adminDoctor'  || authorization.accType == 'admin'){
+        if (authorization.accType == 'doctor' || authorization.accType == 'adminDoctor'  || authorization.accType == 'admin')
             FetchRequestHandler.fetchDoctorPatients(knex, req, res);
-        }
-        else{
-            noAuth401(res);
-        }
+        else
+            serverRespond(res, 401, 'Invalid Credentials');
     }
 });
 
@@ -124,48 +111,45 @@ app.post('/fetch/readings', function (req, res, next) {
         return next();
 
     tokenVerify(callback, res, req);
-    function callback(authorization)
+    function callback (authorization)
     {
         if(authorization.accType == 'doctor' || authorization.accType == 'adminDoctor' )
         {
             //email
-            knex("patients").select().where("id", req.body.id).then( (rows) =>{
-                if( rows.length >= 1)
-                {
-                    if(rows[0].doctorEmail == authorization.email)
+            knex("patients")
+                .select()
+                .where("id", req.body.id)
+                .then(function(rows) {
+                    if( rows.length == 1)
                     {
-                        FetchRequestHandler.fetchReadings(knex, req, res);
+                        if(rows[0].doctorEmail == authorization.email)
+                            FetchRequestHandler.fetchReadings(knex, req, res);
+                        else
+                            serverRespond(res, 401, 'Invalid Credentials');
                     }
-                    else{
-                        noAuth401(res)
-                    }
-                }
-                else{
-                    noAuth401(res)
-                }
-            });
+                    else
+                        serverRespond(res, 400, 'More than one/No patient with ID.');
+                });
         }
         else if (authorization.accType == 'patient')
         {
-            knex("patients").select().where("id", req.body.id).then( (rows) =>{ 
-                if( rows.length >= 1)
-                {
-                    if(rows[0].email == authorization.email)
+            knex("patients")
+                .select()
+                .where("id", req.body.id)
+                .then(function (rows) { 
+                    if( rows.length == 1)
                     {
-                        FetchRequestHandler.fetchReadings(knex, req, res);
+                        if(rows[0].email == authorization.email)
+                            FetchRequestHandler.fetchReadings(knex, req, res);
+                        else
+                            serverRespond(res, 401, 'Invalid Credentials');
                     }
-                    else{
-                        noAuth401(res)
-                    }
-                }
-                else{
-                    noAuth401(res)
-                }
-            });
+                    else
+                        serverRespond(res, 400, 'More than one/No patient with ID.');
+                });
         }
-        else{
-            noAuth401(res);
-        }
+        else
+            serverRespond(res, 401, 'Invalid Credentials');
     }
 
 });
@@ -181,34 +165,28 @@ app.post('/insert/reading', jsonParser, function (req, res, next) {
     if(!req.is('application/json'))
         return next();
     tokenVerify(callback, res, req);
-    function callback(authorization)
+    function callback (authorization)
     {
-
         if(authorization.accType == 'patient')
         {
-            knex("patients").select().where("id", req.body.id).then( (rows) =>{ 
-                if( rows.length >= 1)
-                {
-                    if(rows[0].email == authorization.email)
+            knex("patients")
+                .select()
+                .where("id", req.body.id)
+                .then(function (rows) { 
+                    if( rows.length == 1)
                     {
-                        InsertRequestHandler.insertReading(knex, req, res);
+                        if(rows[0].email == authorization.email)
+                            InsertRequestHandler.insertReading(knex, req, res);
+                        else
+                            serverRespond(res, 401, 'Invalid Credentials');
                     }
-                    else{
-                        noAuth401(res)
-                    }
-                }
-                else{
-                    noAuth401(res)
-                }
-            });
-            //Email check
+                    else
+                        serverRespond(res, 400, 'More than one/No patient with ID.');
+                });
         }
-        else{
-            noAuth401(res);
-        }
-    }
-
-    
+        else
+            serverRespond(res, 401, 'Invalid Credentials');
+    }    
 });
 
 /**
@@ -220,42 +198,35 @@ app.post('/insert/reading', upload.fields([]), function (req, res, next) {
     if(!req.is('multipart/form-data'))
         return next();
     tokenVerify(callback, res, req);
-    function callback(authorization)
+    function callback (authorization)
     {
-
         if(authorization.accType == 'patient')
         {
-            knex("patients").select().where("id", req.body.id).then( (rows) =>{ 
-                if( rows.length >= 1)
-                {
-                    if(rows[0].email == authorization.email)
+            knex("patients")
+                .select()
+                .where("id", req.body.id)
+                .then(function (rows) { 
+                    if( rows.length == 1)
                     {
-                        InsertRequestHandler.insertReading(knex, req, res);
+                        if(rows[0].email == authorization.email)
+                            InsertRequestHandler.insertReading(knex, req, res);
+                        else
+                            serverRespond(res, 401, 'Invalid Credentials');
                     }
-                    else{
-                        noAuth401(res)
-                    }
-                }
-                else{
-                    noAuth401(res)
-                }
-            });
-            //Email check
+                    else
+                        serverRespond(res, 400, 'More than one/No patient with ID.');
+                });
         }
-        else{
-            noAuth401(res);
-        }
+        else
+            serverRespond(res, 401, 'Invalid Credentials');
     }
 });
 
 /**
  * Standard 404 site
  */
-app.post('/insert/reading', function (req, res, next) {''
-    res.status(404)
-        .set('Content-Type', 'text/plain')
-        .send('You took a wrong turn somewhere.')
-        .end();
+app.post('/insert/reading', function (req, res, next) {
+    serverRespond(res, 404, 'You seem to have taken a wrong turn.');
 });
 
 //TOKENS
@@ -267,6 +238,12 @@ app.post('/check/token', jsonParser, function (req, res, next) {
     if(!req.is('application/json'))
         return next();
     TokenHandler.checkUserExists(knex, req, res);
+});
+
+app.post('/token/exchange', function (req, res, next) {
+    if(!req.is('application/json'))
+        return next();
+    TokenHandler.exchangeAuthCode(knex, req, res);
 });
 
 //ACCOUNT
@@ -297,7 +274,7 @@ app.listen(PORT, function ()
  *  @param serverRes Express.js res structure
  *  @param serverReq Express.js req structure (a token is expected in the req otherwise a 401 is returned)
  */
-function tokenVerify(onSuccessCall, serverRes, serverReq)
+function tokenVerify (onSuccessCall, serverRes, serverReq)
 {
     var accessToken = serverReq.body['accessToken'];
     if(accessToken == null)
@@ -310,18 +287,13 @@ function tokenVerify(onSuccessCall, serverRes, serverReq)
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
     };
-    var httpsReq = https.request(httpsOptions, fooCall);
+    var httpsReq = https.request(httpsOptions, tokenCB);
     httpsReq.on('error', function(err) {
         console.log('problem with request: ' + err.message);
     });
     httpsReq.end();
-    function notRegistered(res)
-    {
-        return res.status(401).set('Content-Type', 'text/plain')
-        .send('You shall not pass.')
-        .end();
-    }
-    function fooCall (res)
+
+    function tokenCB (res)
     {
         res.on('data', function (cbBody) { //returns json object with accType and email, or 401 if invalid token
             var retObj = JSON.parse(cbBody);
@@ -334,9 +306,7 @@ function tokenVerify(onSuccessCall, serverRes, serverReq)
                     .where('email', email)
                     .then(function (rows) {
                         if (rows.length > 0)
-                        {
-                            onSuccessCall({'accType': rows[0].accType, 'email': email});
-                        }
+                            onSuccessCall({ accType: rows[0].accType, email: email });
                         else
                         {
                             knex
@@ -344,31 +314,29 @@ function tokenVerify(onSuccessCall, serverRes, serverReq)
                                 .from('patients')
                                 .where('email', email)
                                 .then(function (patRows) {
-                                    if (rows.length > 0){
-                                        onSuccessCall({'accType': 'patient', 'email': email});
-                                    }
-                                    else{
-                                        notRegistered(serverRes);
-                                    }
+                                    if (rows.length > 0)
+                                        onSuccessCall({ accType: 'patient', email: email });
+                                    else
+                                        serverRespond(serverRes, 401, 'No Access');
                                 });
                         }
                     });
             }
-            else{
-                notRegistered(serverRes);
-            }
+            else
+                serverRespond(serverRes, 401, 'No Access');
         });
     }
 }
 
 /*
-* Just sets server response to 401 Not authorized.
+* Macro for setting server response
 */
-function noAuth401(res)
+function serverRespond (res, status, message)
 {
-    res.status(401).set('Content-Type', 'text/plain')
-    .send('Not authorized.')
-    .end();
+    res.status(status)
+        .set('Content-Type', 'text/plain')
+        .send(message)
+        .end();
 }
 
 module.exports = app;

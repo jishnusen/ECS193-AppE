@@ -127,4 +127,86 @@ function checkUserExists (knex, req, res)
     verify(); //call the function we just made
 }
 
+function exchangeAuthCode (knex, req, res)
+{
+    const {OAuth2Client} = require('google-auth-library');
+    const client = new OAuth2Client(process.env.CLIENT_ID);
+
+    var accessToken = '';
+    var refreshToken = '';
+
+    client.getToken(req.body.authCode, function (err, tokens) {
+        if (err)
+        {
+            console.log(err);
+            res.status(400)
+                .set('Content-Type', 'text/plain')
+                .send('Error getting tokens')
+                .end();
+            return;
+        }
+
+        //console.log(tokens);
+        accessToken = tokens.access_token;
+        refreshToken = tokens.refresh_token;
+
+        var httpsOptions = {
+            hostname: 'www.googleapis.com',
+            port: 443,
+            path: '/oauth2/v1/userinfo?access_token=' + accessToken,
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+        };
+
+        var httpsReq = https.request(httpsOptions, httpsCB);
+        httpsReq.on('error', function(err) {
+            console.log('problem with request: ' + err.message);
+        });
+        httpsReq.end();
+    });
+
+    function httpsCB (cbRes)
+    {
+        cbRes.setEncoding('utf8');
+        cbRes.on('data', function (cbBody) {
+            var retObj = JSON.parse(cbBody);
+
+            if (retObj.hasOwnProperty('error'))
+            {
+                res.status(401)
+                    .set('Content-Type', 'text/plain')
+                    .send('Invalid Token')
+                    .end();
+                return;
+            }
+
+            var email = retObj.email;
+            knex('patients')
+                .select()
+                .where('email', email)
+                .then(function (rows) {
+                    if (rows.length == 0)
+                    {
+                        res.status(401)
+                            .set('Content-Type', 'text/plain')
+                            .send('Invalid Credentials')
+                            .end();
+                    }
+                    else
+                    {
+                        var data = {
+                            accessToken: accessToken,
+                            refreshToken: refreshToken
+                        };
+                        res.status(200)
+                            .set('Content-Type', 'text/plain')
+                            .send(JSON.stringify(data))
+                            .end();
+                    }
+                });
+        });
+    }
+}
+
 module.exports.checkUserExists = checkUserExists;
+module.exports.exchangeAuthCode = exchangeAuthCode;
