@@ -23,14 +23,11 @@ var knex = Connect()
 function Connect () //establish connection with database
 {	
     var config = { //make sure your environment variables are set. This is for creating the proxy connection
-        host: 8080,
         user: process.env.SQL_USER,
         password: process.env.SQL_PASSWORD,
         database: process.env.SQL_DATABASE
-	};
-    config.user = 'huhu';
-    config.password = 'password';
-    config.database = 'ecs193_database';
+    };
+    
      if (process.env.INSTANCE_CONNECTION_NAME && process.env.NODE_ENV === 'production') 
         config.socketPath = `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`; //sets path to databse
     
