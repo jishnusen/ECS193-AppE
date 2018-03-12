@@ -278,7 +278,7 @@ function tokenVerify (onSuccessCall, serverRes, serverReq)
 {
     var accessToken = serverReq.body['accessToken'];
     if(accessToken == null)
-        noAuth401(serverRes)
+        serverRespond(serverRes, 401, 'No Access');
 
     var httpsOptions = {
         hostname: 'www.googleapis.com',
@@ -314,7 +314,7 @@ function tokenVerify (onSuccessCall, serverRes, serverReq)
                                 .from('patients')
                                 .where('email', email)
                                 .then(function (patRows) {
-                                    if (rows.length > 0)
+                                    if (patRows.length > 0)
                                         onSuccessCall({ accType: 'patient', email: email });
                                     else
                                         serverRespond(serverRes, 401, 'No Access');

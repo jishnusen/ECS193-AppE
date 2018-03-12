@@ -12,10 +12,10 @@ if (process.env.NODE_ENV != 'production')
     process.env.CLIENT_ELEC_ID = '671445578517-io87npos82nmk6bk24ttgikc9h4uls4l.apps.googleusercontent.com';
     process.env.CLIENT_WEB_SECRET = 'K6gGjixzDWcT18inlGLnydQv';
 }
-CLIENT_IDS = [process.env.CLIENT_ID, process.env.CLIENT_ELEC_ID, process.env.CLIENT_EMAILER];
+CLIENT_IDS = [process.env.CLIENT_ID, process.env.CLIENT_ELEC_ID];
 
 var auth = google.auth;
-var client = auth.OAuth2(process.env.CLIENT_ID, process.env.CLIENT_WEB_SECRET, 'http://localhost');
+var client = new auth.OAuth2(process.env.CLIENT_ID, process.env.CLIENT_WEB_SECRET, 'http://localhost');
 
 function exchangeAuthCode (knex, req, res)
 {
@@ -96,5 +96,4 @@ function exchangeAuthCode (knex, req, res)
     }
 }
 
-module.exports.checkUserExists = checkUserExists;
 module.exports.exchangeAuthCode = exchangeAuthCode;

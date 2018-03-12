@@ -115,8 +115,12 @@ function insertReading (knex, req, res)
 	var msg = '';
 	var table_name = '';
 	
+	var count = 0;
 	for (var key in body) // Process the request body collecting all properties, if the property is a JSON object it will be parsed as a JSON object before being stored.
 	{
+		count++;
+		if (count <= 2)
+			continue;
 		table_name = key; 
 		if(Array.isArray(body[key]))
 			values = body[key].map(x => JSON.parse(x));
