@@ -5,6 +5,8 @@ const mailjet = require('node-mailjet');
 const https = require('https');
 const randomstring = require('randomstring');
 const InsertRequestHandler = require('./InsertRequestHandler.js');
+const util = require('./util.js');
+const Authenticator = require('./Authenticator.js');
 
 var CLIENT_IDS = [];
 if (process.env.NODE_ENV != 'production')
@@ -22,65 +24,10 @@ validationPairs.push('admin-admin');
 validationPairs.push('admin-doctor');
 validationPairs.push('doctor-patient');
 
-function checkTokenPriviledges (knex, accessToken, cb)
-{
-    var httpsOptions = {
-        hostname: 'www.googleapis.com',
-        port: 443,
-        path: '/oauth2/v1/tokeninfo?access_token=' + accessToken,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    };
-
-    var httpsReq = https.request(httpsOptions, httpsCB);
-    httpsReq.on('error', function(err) {
-        console.log('problem with request: ' + err.message);
-    });
-    httpsReq.end();
-
-    function httpsCB (res)
-    {
-        res.setEncoding('utf8');
-        res.on('data', function (cbBody) {
-            var retObj = JSON.parse(cbBody);
-            if (retObj.hasOwnProperty('error'))
-            {
-                cb('invalid', '');
-                return;
-            }
-            var email = retObj.email;
-            knex
-                .select()
-                .from('faculty')
-                .where('email', email)
-                .then(function (rows) {
-                    if (rows.length > 0)
-                    {
-                        cb(rows[0].accType, email);
-                    }
-                    else
-                    {
-                        knex
-                            .select()
-                            .from('patients')
-                            .where('email', email)
-                            .then(function (patRows) {
-                                if (rows.length > 0)
-                                    cb('patient', email);
-                                else
-                                    cb('invalid', '');
-                            });
-                    }
-                });
-        });
-    }
-}
-
 function checkAccountExists (knex, email, cb)
 {
-    knex
+    knex('faculty')
         .select()
-        .from('faculty')
         .where('email', email)
         .then(function (rows) {
             if (rows.length > 0)
@@ -105,9 +52,8 @@ function checkAccountExists (knex, email, cb)
 
 function checkActiveVerification (knex, to, cb)
 {
-    knex
+    knex('pendingVerification')
         .select()
-        .from('pendingVerification')
         .where('to', to)
         .then(function (rows) {
             if (rows.length > 0)
@@ -127,10 +73,9 @@ function sendEmail (knex, req, res)
         process.env.MAILJET_PRIVATE = '0b74bf7ddd333cad1d75c2dd2570cd7a';
     }
 
-    var accessToken = body['accessToken'];
-    var newAccType = body['newAccType'];
-    var toEmail = body['recipientEmail'];
-    var toName = body['recipientName'];
+    var newAccType = body.newAccType;
+    var toEmail = body.recipientEmail;
+    var toName = body.recipientName;
     var fromEmail = '';
 
     checkAccountExists(knex, toEmail, accExistance);
@@ -139,44 +84,35 @@ function sendEmail (knex, req, res)
     {
         if (exists)
         {
-            res.status(400)
-                .set('Content-Type', 'text/plain')
-                .send("Account Already Exists for Email")
-                .end();
+            util.respond(res, 400, JSON.stringify({err: 'Account Already Exists for Email'}));
             return;
         }
-        checkTokenPriviledges(knex, accessToken, accRetrieved);
+        Authenticator.getRequestor(knex, req, gotRequestor);
     }
 
-    function accRetrieved (accType, from)
+    function gotRequestor (requestor)
     {
-        if (accType == 'invalid')
+        if (requestor.hasOwnProperty('err'))
         {
-            res.status(400)
-                .set('Content-Type', 'text/plain')
-                .send("Invalid Credentials")
-                .end();
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
             return;
         }
 
+        var accType = requestor.accType;
         var checkPair = accType + '-' + newAccType;
         if (!validationPairs.includes(checkPair))
         {
-            res.status(400)
-                .set('Content-Type', 'text/plain')
-                .send("Account type '" + accType + "' cannot add account type '" + newAccType + "'")
-                .end();
+            util.respond(res, 400, JSON.stringify({err: 'Account type "' + accType + '" cannot add account type "' + newAccType + '"'}));
             return;
         }
 
-        fromEmail = from;
+        fromEmail = requestor.email;
 
         var randStr = randomstring.generate(64);
 
         updateVerifyLink(randStr);
 
         var host = 'https://majestic-legend-193620.appspot.com';
-        //var host = 'http://localhost:8080';
 
         var mailData = {
             'Messages': [{
@@ -190,7 +126,7 @@ function sendEmail (knex, req, res)
                 }],
                 'Subject': 'Account Activation',
                 'TextPart': randStr,
-                'HtmlPart': '<a href="' + host + '/validate?v=' + randStr + '">Hello There</a>'
+                'HtmlPart': '<a href="' + host + '/account/validate?v=' + randStr + '">Hello There</a>'
             }]   
         };
 
@@ -200,17 +136,11 @@ function sendEmail (knex, req, res)
         request
             .then(function (result) {
                 //console.log(result.body);
-                res.status(200)
-                    .set('Content-Type', 'text/plain')
-                    .send("EMAIL SENT")
-                    .end();
+                util.respond(res, 200, JSON.stringify({body: 'EMAIL SENT'}));
             })
             .catch(function (err) {
                 //console.log(err);
-                res.status(400)
-                    .set('Content-Type', 'text/plain')
-                    .send("ERROR ON SEND")
-                    .end();
+                util.respond(res, 400, JSON.stringify({err: 'ERROR ON SEND'}));
             });
     }
 
@@ -258,10 +188,7 @@ function insertVerify (knex, req, res)
 {
 	if (!req.query.hasOwnProperty('v'))
 	{
-		res.status(400)
-			.set('Content-Type', 'text/plain')
-			.send('Insert verification link form invalid.')
-			.end();
+        util.respond(res, 400, JSON.stringify({err: 'Insert verification link form invalid.'}));
 		return;
 	}
     
@@ -273,16 +200,9 @@ function insertVerify (knex, req, res)
         .where('code', v)
         .then(function(rows) {
             if (rows.length > 0)
-            {
                 validCode(rows[0]);
-            }
             else
-            {
-                res.status(400)
-                    .set('Content-Type', 'text/plain')
-                    .send('Insert verification code invalid.')
-                    .end();
-            }
+                util.respond(res, 400, JSON.stringify({err: 'Insert verification code invalid'}));
         });
     
     function validCode (row)
@@ -290,10 +210,7 @@ function insertVerify (knex, req, res)
         //console.log(row);
         if (row.activeCode == 0)
         {
-            res.status(400)
-                .set('Content-Type', 'text/plain')
-                .send('Verification code invalid.')
-                .end();
+            util.respond(res, 400, JSON.stringify({err: 'Verification code invalid.'}));
             return;
         }
 

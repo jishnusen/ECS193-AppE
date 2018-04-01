@@ -1,6 +1,7 @@
-var process = require('process');
-var express = require('express');
-var Knex = require('knex');
+const process = require('process');
+const express = require('express');
+const Knex = require('knex');
+const util = require('./util.js');
 
 /** A List of all avalible data inserting functions for the MySQL database that are avalible on the AppEngine */
 /**
@@ -108,61 +109,53 @@ function insertFaculty (knex, data, res)
 **/
 function insertReading (knex, req, res)
 {
-	var body = req.body;
-	var resmsg = '';
-	var errmsg = '';
-	var success = true;
-	var msg = '';
-	var table_name = '';
-	
-	var count = 0;
-	for (var key in body) // Process the request body collecting all properties, if the property is a JSON object it will be parsed as a JSON object before being stored.
+	var id = req.body.id;
+	var table = 'patient_' + id;
+	var readings = req.body.readings;
+	var badFlag = false;
+	var insertCount = 0;
+
+	for (var i = 0; i < readings.length; i++)
 	{
-		count++;
-		if (count <= 2)
-			continue;
-		table_name = key; 
-		if(Array.isArray(body[key]))
-			values = body[key].map(x => JSON.parse(x));
-		else
-			try 
-			{
-				values = JSON.parse(body[key]);
-			}
-			catch(e) 
-			{
-				values = body[key];
-			}
-			break;
+		var hasProps = util.checkProperties(['timestamp', 'channels'], readings[i]);
+		if (!hasProps)
+		{
+			util.respond(res, 400, JSON.stringify({err: 'Bad Request'}));
+			return;
+		}
+		if (readings[i].channels.length != 64)
+		{
+			util.respond(res, 400, JSON.stringify({err: 'Bad Request'}));
+			return;
+		}
 	}
 
-	temp = knex(table_name).insert(values); //creates the knex insert request
-	knex.schema.hasTable(table_name).then(function (exists) { //checks if the patient table exists
-		if(exists)
-		{
-				temp.then (function (result) { //sends the knex insert request to MySQL
-					res.status(200)
-						.set('Content-Type', 'text/plain')
-						.send("All insertions were success.")
-						.end();
-				})
-				.catch(function (err) {
-					errmsg += err;				
-					res.status(400)
-						.set('Content-Type', 'text/plain')
-						.send("The following commands had errors: " + errmsg)
-						.end();
-				});
-		}
-		else
-		{
-			errmsg += "Table: " + table_name + " does not exist.\n";
-			res.status(400)
-				.set('Content-Type', 'text/plain')
-				.send("The following commands had errors: " + errmsg)
-				.end();
-		}
-	});
+	for (var i = 0; i < readings.length; i++)
+	{
+		var insertStr = '{"timestamp":"' + readings[i].timestamp + '",';
+		for (var j = 0; j < 63; j++)
+			insertStr += '"ch' + j + '":"' + readings[i].channels[j] + '",';
+		insertStr += '"ch63":"' + readings[i].channels[63] + '"}';
+		var insertObj = JSON.parse(insertStr);
+
+		knex(table)
+			.insert(insertObj)
+			.then((result) => {
+				insertCount++;
+				if (insertCount == readings.length)
+					util.respond(res, 200, JSON.stringify({body: 'Successful Insert'}));
+			})
+			.catch((err) => {
+				errored();
+			});
+	}
+
+	function errored () 
+	{
+		if (!badFlag)
+			util.respond(res, 400, JSON.stringify({err: 'Bad Insert'}));
+		badFlag = true;
+	}
 }
 
 module.exports.insertPatient = insertPatient;

@@ -3,10 +3,11 @@ const express = require('express');
 const Knex = require('knex');
 const https = require('https');
 
+const util = require('./util.js');
 const FetchRequestHandler = require('./FetchRequestHandler.js');
 const InsertRequestHandler = require('./InsertRequestHandler.js');
-const TokenHandler = require('./TokenHandler.js');
-const AccountVerification = require('./AccountVerification.js');
+const Authenticator = require('./Authenticator.js');
+const AccountHandler = require('./AccountHandler.js');
 
 const app = express();
 const multer = require('multer');
@@ -55,13 +56,24 @@ app.post('/fetch/doctors', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
 
-    tokenVerify(callback, res, req);
-    function callback (authorization) //authorization is a JSON with accType and email
+    var hasProps = util.checkProperties(['authCode'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
     {
-        if (authorization.accType == 'doctor' || authorization.accType == 'adminDoctor' || authorization.accType == 'admin')
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType != 'patient')
             FetchRequestHandler.fetchDoctors(knex, req, res);
         else
-            serverRespond(res, 401, 'Invalid Credentials');
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
     }
 });
 
@@ -74,13 +86,24 @@ app.post('/fetch/idFromEmail', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
 
-    tokenVerify(callback, res, req);
-    function callback (authorization)
+    var hasProps = util.checkProperties(['authCode'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
     {
-        if (authorization.accType == 'doctor' || authorization.accType == 'adminDoctor' || authorization.accType == 'admin')
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType != 'patient')
             FetchRequestHandler.fetchIDfromEmail(knex, req, res);
         else
-            serverRespond(res, 401, 'Invalid Credentials');
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
     }
 });
 
@@ -92,13 +115,24 @@ app.post('/fetch/doctorList', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
 
-    tokenVerify(callback, res, req);
-    function callback (authorization)
+    var hasProps = util.checkProperties(['authCode'], req.body);    
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
     {
-        if (authorization.accType == 'doctor' || authorization.accType == 'adminDoctor'  || authorization.accType == 'admin')
-            FetchRequestHandler.fetchDoctorPatients(knex, req, res);
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType != 'patient')
+            FetchRequestHandler.fetchDoctorPatients(knex, requestor.email, res);
         else
-            serverRespond(res, 401, 'Invalid Credentials');
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
     }
 });
 
@@ -110,48 +144,51 @@ app.post('/fetch/readings', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
 
-    tokenVerify(callback, res, req);
-    function callback (authorization)
-    {
-        if(authorization.accType == 'doctor' || authorization.accType == 'adminDoctor' )
-        {
-            //email
-            knex("patients")
-                .select()
-                .where("id", req.body.id)
-                .then(function(rows) {
-                    if( rows.length == 1)
-                    {
-                        if(rows[0].doctorEmail == authorization.email)
-                            FetchRequestHandler.fetchReadings(knex, req, res);
-                        else
-                            serverRespond(res, 401, 'Invalid Credentials');
-                    }
-                    else
-                        serverRespond(res, 400, 'More than one/No patient with ID.');
-                });
-        }
-        else if (authorization.accType == 'patient')
-        {
-            knex("patients")
-                .select()
-                .where("id", req.body.id)
-                .then(function (rows) { 
-                    if( rows.length == 1)
-                    {
-                        if(rows[0].email == authorization.email)
-                            FetchRequestHandler.fetchReadings(knex, req, res);
-                        else
-                            serverRespond(res, 401, 'Invalid Credentials');
-                    }
-                    else
-                        serverRespond(res, 400, 'More than one/No patient with ID.');
-                });
-        }
-        else
-            serverRespond(res, 401, 'Invalid Credentials');
-    }
+    var hasProps = util.checkProperties(['authCode', 'id'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
 
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType == 'admin')
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            return;
+        }
+
+        knex('patients')
+            .select()
+            .where('id', req.body.id)
+            .then((rows) => {
+                if (rows.length == 1)
+                {
+                    if (requestor.accType != 'patient')
+                    {
+                        if (rows[0].doctorEmail == requestor.email)
+                            FetchRequestHandler.fetchReadings(knex, req, res);
+                        else
+                            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                    }
+                    else
+                    {
+                        if (rows[0].email == requestor.email)
+                            FetchRequestHandler.fetchReadings(knex, req, res);
+                        else
+                            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                    }
+                }
+                else
+                    util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+            });
+    }
 });
 
 
@@ -159,103 +196,109 @@ app.post('/fetch/readings', function (req, res, next) {
 
 /**
  *  This site processes a post request and inserts patient reading information into the reading table.
- *  example post body: {id:1234, ch1: 1, ch2: 5, ch3: 6, ... , ch64:...}
- */
-app.post('/insert/reading', jsonParser, function (req, res, next) {
-    if(!req.is('application/json'))
-        return next();
-    tokenVerify(callback, res, req);
-    function callback (authorization)
-    {
-        if(authorization.accType == 'patient')
-        {
-            knex("patients")
-                .select()
-                .where("id", req.body.id)
-                .then(function (rows) { 
-                    if( rows.length == 1)
-                    {
-                        if(rows[0].email == authorization.email)
-                            InsertRequestHandler.insertReading(knex, req, res);
-                        else
-                            serverRespond(res, 401, 'Invalid Credentials');
-                    }
-                    else
-                        serverRespond(res, 400, 'More than one/No patient with ID.');
-                });
-        }
-        else
-            serverRespond(res, 401, 'Invalid Credentials');
-    }    
-});
-
-/**
- *  This site processes a post request and inserts patient reading information into the reading table.
- *  example post body: {id:1234, ch1: 1, ch2: 5, ch3: 6, ... , ch64:...}
- *  This site will take in multipart/formdata instead of json formatted data.
- */
-app.post('/insert/reading', upload.fields([]), function (req, res, next) {
-    if(!req.is('multipart/form-data'))
-        return next();
-    tokenVerify(callback, res, req);
-    function callback (authorization)
-    {
-        if(authorization.accType == 'patient')
-        {
-            knex("patients")
-                .select()
-                .where("id", req.body.id)
-                .then(function (rows) { 
-                    if( rows.length == 1)
-                    {
-                        if(rows[0].email == authorization.email)
-                            InsertRequestHandler.insertReading(knex, req, res);
-                        else
-                            serverRespond(res, 401, 'Invalid Credentials');
-                    }
-                    else
-                        serverRespond(res, 400, 'More than one/No patient with ID.');
-                });
-        }
-        else
-            serverRespond(res, 401, 'Invalid Credentials');
-    }
-});
-
-/**
- * Standard 404 site
+ *  example post body:
+ * {
+ *   authCode: ****,
+ *   id: 0,
+ *   readings: [
+ *     {timestamp: ****, channels: [0, 1, 2, 3, 4, ..., 63]},
+ *     {...}
+ *   ]
+ * }
  */
 app.post('/insert/reading', function (req, res, next) {
-    serverRespond(res, 404, 'You seem to have taken a wrong turn.');
+    if(!req.is('application/json'))
+        return next();
+    
+    var hasProps = util.checkProperties(['authCode', 'id', 'readings'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType != 'patient')
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            return;
+        }
+
+        knex('patients')
+            .select()
+            .where('id', req.body.id)
+            .then((rows) => {
+                if (rows.length == 1)
+                {
+                    if (rows[0].email == requestor.email)
+                        InsertRequestHandler.insertReading(knex, req, res);
+                    else
+                        util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                }
+                else
+                    util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+            });
+    } 
 });
 
-//TOKENS
+//TOKENS -OLD
 
-/**
- * Verifies Oauth2 token
- */
+/*
 app.post('/check/token', jsonParser, function (req, res, next) {
     if(!req.is('application/json'))
         return next();
-    TokenHandler.checkUserExists(knex, req, res);
+    Authenticator.checkUserExists(knex, req, res);
 });
 
 app.post('/token/exchange', function (req, res, next) {
     if(!req.is('application/json'))
         return next();
-    TokenHandler.exchangeAuthCode(knex, req, res);
+    Authenticator.exchangeAuthCode(knex, req, res);
 });
+*/
 
 //ACCOUNT
 
-app.post('/token/sendEmail', jsonParser, function (req, res, next) {
+app.post('/account/sendEmail', jsonParser, function (req, res, next) {
     if (!req.is('application/json'))
         return next();
-    AccountVerification.sendEmail(knex, req, res);
+    var hasProps = util.checkProperties(['authCode', 'newAccType', 'recipientEmail', 'recipientName'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        AccountHandler.sendEmail(knex, req, res);
 });
 
-app.get('/validate', function (req, res, next) {
-    AccountVerification.insertVerify(knex, req, res);
+app.get('/account/validate', function (req, res, next) {
+    AccountHandler.insertVerify(knex, req, res);
+});
+
+//AUTHENTICATION
+
+app.post('/security/getAuth', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+    var hasProps = util.checkProperties(['accessToken'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getAuthForToken(knex, req, res);
+});
+
+app.post('/security/revokeAuth', function (req, res, next) {
+    if (!req.is('application.json'))
+        return next();
+    var hasProps = util.checkProperties(['email', 'authCode', 'accType'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.revokeAuthentication(knex, req, res);
 });
 
 /**
@@ -268,6 +311,7 @@ app.listen(PORT, function ()
     console.log('Press Ctrl+C to quit.');
 });
 
+//UNUSED
 /**
  *  Verify Oauth2 Access tokens and allows access to SQL
  *  @param onSuccessCall a callback function (this is called regardless of whether the token is valid or not)
@@ -278,7 +322,7 @@ function tokenVerify (onSuccessCall, serverRes, serverReq)
 {
     var accessToken = serverReq.body['accessToken'];
     if(accessToken == null)
-        serverRespond(serverRes, 401, 'No Access');
+        util.respond(serverRes, 401, 'No Access');
 
     var httpsOptions = {
         hostname: 'www.googleapis.com',
@@ -317,27 +361,15 @@ function tokenVerify (onSuccessCall, serverRes, serverReq)
                                     if (patRows.length > 0)
                                         onSuccessCall({ accType: 'patient', email: email });
                                     else
-                                        serverRespond(serverRes, 401, 'No Access');
+                                        util.respond(serverRes, 401, 'No Access');
                                 });
                         }
                     });
             }
             else
-                serverRespond(serverRes, 401, 'No Access');
+                util.respond(serverRes, 401, 'No Access');
         });
     }
 }
 
-/*
-* Macro for setting server response
-*/
-function serverRespond (res, status, message)
-{
-    res.status(status)
-        .set('Content-Type', 'text/plain')
-        .send(message)
-        .end();
-}
-
 module.exports = app;
-

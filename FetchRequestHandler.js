@@ -1,6 +1,5 @@
-var process = require('process');
-var express = require('express');
-var Knex = require('knex');
+const util = require('./util.js');
+
 /** A list of all valid SQL fetching functions avalible on google app engine */
 /**
 *	This function processes the POST request and sends a POST to the SQL database to SELECT doctors from the appropriate table.
@@ -19,10 +18,7 @@ function fetchDoctors (knex, req, res)
         })
         .then(function (results) {
             var emails = results.map((row) => { return row.email; });
-            res.status(200)
-                .set('Content-Type', 'text/plain')
-                .send(JSON.stringify(emails))
-                .end();
+            util.respond(res, 200, JSON.stringify({emails: emails}));
         });
 }
 
@@ -35,21 +31,16 @@ function fetchDoctors (knex, req, res)
 **/
 function fetchIDfromEmail (knex, req, res)
 {
-    var data = req.body;
-
     knex
         .select()
         .from('patients')
-        .where('email', data.email)
+        .where('email', req.body.email)
         .then(function (results) {
             var ids = results.map((row) => { return row.id; });
             if (ids.length == 1)
-            {
-                res.status(200)
-                    .set('Content-Type', 'text/plain')
-                    .send(ids[0].toString())
-                    .end();
-            }
+                util.respond(res, 200, JSON.stringify({id: ids[0]}));
+            else
+                util.respond(res, 400, JSON.stringify({err: 'Bad Fetch'}));
         });
 }
 
@@ -60,20 +51,15 @@ function fetchIDfromEmail (knex, req, res)
 *	@param req  - the POST request
 *   @param res  - the POST response
 **/
-function fetchDoctorPatients (knex, req, res)
+function fetchDoctorPatients (knex, email, res)
 {
-    var data = req.body;
-
     knex
         .select()
         .from('patients')
-        .where('doctorEmail', data.doctor)
+        .where('doctorEmail', email)
         .then(function (results) {
             var ids = results.map((row) => { return row.id; });
-            res.status(200)
-                .set('Content-Type', 'text/plain')
-                .send(JSON.stringify(ids))
-                .end();
+            util.respond(res, 200, JSON.stringify(ids));
         });
 }
 
@@ -109,10 +95,7 @@ function fetchReadings (knex, req, res)
                     rowParse += '\n';
                 csv += rowParse;
             });
-            res.status(200)
-                .set('Content-Type', 'text/plain')
-                .send(csv)
-                .end();
+            util.respond(res, 200, csv);
         });
 }
 
@@ -149,10 +132,7 @@ function fetchReadingsSize (knex, req, res, ids)
                     rowParse += '\n';
                 csv += rowParse;
             });
-            res.status(200)
-                .set('Content-Type', 'text/plain')
-                .send(csv.length.toString())
-                .end();
+            util.respond(res, 200, csv.length.toString());
         });
 }
 
