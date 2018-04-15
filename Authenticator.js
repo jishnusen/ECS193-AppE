@@ -1,8 +1,8 @@
-var process = require('process');
-var express = require('express');
-var Knex = require('knex');
-var mailjet = require('node-mailjet');
-var https = require('https');
+const process = require('process');
+const express = require('express');
+const Knex = require('knex');
+const mailjet = require('node-mailjet');
+const https = require('https');
 const {google} = require('googleapis');
 const randomstring = require('randomstring');
 const util = require('./util.js');
@@ -17,8 +17,12 @@ if (process.env.NODE_ENV != 'production')
 }
 CLIENT_IDS = [process.env.CLIENT_ID, process.env.CLIENT_ELEC_ID];
 
-var auth = google.auth;
+const auth = google.auth;
 var client = new auth.OAuth2(process.env.CLIENT_ID, process.env.CLIENT_WEB_SECRET, 'http://localhost');
+
+var lastCheckedTime = Date.now(); //implementation of "lazy timer"
+const thirtyMinutes = 1800000;
+const sixtyMinutes = thirtyMinutes*2;
 
 function exchangeAuthCode (knex, req, res)
 {
@@ -153,6 +157,15 @@ function getAuthForToken (knex, req, res)
     }
 }
 
+/**
+ * Adds digest hash to database
+ * Session is set to valid and will last 60 minutes
+ * @param {*} knex - database handler
+ * @param {*} email - user email
+ * @param {*} accType - user account type
+ * @param {*} digest - valid session hash for users
+ * @param {*} cb - callack on successful validation
+ */
 function addAuthentication (knex, email, accType, digest, cb)
 {
     var table = 'faculty';
@@ -165,18 +178,24 @@ function addAuthentication (knex, email, accType, digest, cb)
         .then((rows) => {
             if (rows.length == 0)
                 cb(false);
-            else if (rows[0].digest != 'null')
-                cb(false);
+            //else if (rows[0].digest != 'null')
+            //    cb(false);
             else
             {
                 knex(table)
                     .where('email', email)
-                    .update('digest', digest)
+                    .update({'digest':digest, 'expire': false})
                     .then(() => { cb(true); });
             }
         });
 }
 
+/**
+ * Validates digest
+ * @param {*} knex  - database handler
+ * @param {*} req - request body
+ * @param {*} cb - funct to call on success
+ */
 function getRequestor (knex, req, cb)
 {
     var authCode = req.body.authCode;
@@ -184,9 +203,46 @@ function getRequestor (knex, req, cb)
     hash.update(authCode, 'utf8');
     var digest = hash.digest('hex');
 
+    var curTime = Date.now();
+    var lastPlusThirty = lastCheckedTime+thirtyMinutes;
+    var lastPlusSixty = lastCheckedTime+sixtyMinutes;
+    
+    if( lastPlusSixty < curTime )
+    {
+        knex('faculty')
+            .update({'digest':'null','expire': false})
+            .then(()=>{});
+        knex('patients')
+            .update({'digest':'null','expire': false})
+            .then(()=>{});
+        lastCheckedTime = curTime;
+    }
+    else if (lastPlusThirty < curTime)
+    {
+
+        knex('faculty')
+            .where('expire',true)
+            .update({'digest':'null','expire': false})
+            .then(()=>{
+                knex('faculty')
+                    .whereNot('digest', 'null')
+                    .update('expire',true).then(()=>{});
+            });
+        knex('patients')
+            .where('expire',true)
+            .update({'digest':'null','expire': false})
+            .then(()=>{
+                knex('patients')
+                    .whereNot('digest', 'null')
+                    .update('expire',true).then(()=>{});
+            });
+        lastCheckedTime = curTime;
+    }
+
     knex('faculty')
         .select()
         .where('digest', digest)
+        .update('expire', false) //refreshes expiration since session is still valid.
         .then((frows) => {
             if (frows.length > 0)
             {
@@ -202,6 +258,7 @@ function getRequestor (knex, req, cb)
                 knex('patients')
                     .select()
                     .where('digest', digest)
+                    .update('expire', false) //refreshes expiration since session is still valid.
                     .then((prows) => {
                         if (prows.length > 0)
                         {
@@ -258,7 +315,7 @@ function revokeAuthentication (knex, req, res)
             table = 'patients';
         knex(table)
             .where('email', email)
-            .update('digest', 'null')
+            .update({'digest': 'null', 'expire': false})
             .then(() => {
                 util.respond(res, 200, JSON.stringify({body: 'Authentication Revoked'}));
             });
