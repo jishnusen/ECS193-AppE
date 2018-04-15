@@ -204,78 +204,99 @@ function getRequestor (knex, req, cb)
     var digest = hash.digest('hex');
 
     var curTime = Date.now();
-    var lastPlusThirty = lastCheckedTime+thirtyMinutes;
-    var lastPlusSixty = lastCheckedTime+sixtyMinutes;
+    var lastPlusThirty = lastCheckedTime + thirtyMinutes;
+    var lastPlusSixty = lastCheckedTime + sixtyMinutes;
+    var finishCnt = 0;
     
-    if( lastPlusSixty < curTime )
+    if (lastPlusSixty < curTime )
     {
         knex('faculty')
-            .update({'digest':'null','expire': false})
-            .then(()=>{});
+            .update({'digest': 'null', 'expire': false})
+            .then(() => {});
         knex('patients')
-            .update({'digest':'null','expire': false})
-            .then(()=>{});
+            .update({'digest': 'null', 'expire': false})
+            .then(() => {});
         lastCheckedTime = curTime;
+        cb({err: 'Invalid Auth Code'});
+        return;
     }
     else if (lastPlusThirty < curTime)
     {
-
         knex('faculty')
-            .where('expire',true)
-            .update({'digest':'null','expire': false})
-            .then(()=>{
+            .where('expire', true)
+            .update({'digest': 'null', 'expire': false})
+            .then(() => {
                 knex('faculty')
                     .whereNot('digest', 'null')
-                    .update('expire',true).then(()=>{});
+                    .update('expire', true)
+                    .then(() => {
+                        finishCnt++;
+                        onTimerCheck();
+                    });
             });
         knex('patients')
-            .where('expire',true)
-            .update({'digest':'null','expire': false})
-            .then(()=>{
+            .where('expire', true)
+            .update({'digest': 'null', 'expire': false})
+            .then(() => {
                 knex('patients')
                     .whereNot('digest', 'null')
-                    .update('expire',true).then(()=>{});
+                    .update('expire', true)
+                    .then(() => {
+                        finishCnt++;
+                        onTimerCheck();
+                    });
             });
         lastCheckedTime = curTime;
     }
+    else
+    {
+        finishCnt = 2;
+        onTimerCheck();
+    }
 
-    knex('faculty')
-        .select()
-        .where('digest', digest)
-        .update('expire', false) //refreshes expiration since session is still valid.
-        .then((frows) => {
-            if (frows.length > 0)
-            {
-                var retObj = {
-                    email: frows[0].email,
-                    accType: frows[0].accType,
-                    name: frows[0].name
-                };
-                cb(retObj);
-            }
-            else
-            {
-                knex('patients')
-                    .select()
-                    .where('digest', digest)
-                    .update('expire', false) //refreshes expiration since session is still valid.
-                    .then((prows) => {
-                        if (prows.length > 0)
-                        {
-                            var retObj = {
-                                email: prows[0].email,
-                                accType: 'patient',
-                                patientID: prows[0].id
-                            };
-                            cb(retObj);
-                        }
-                        else
-                        {
-                            cb({err: 'Invalid Auth Code'});
-                        }
-                    });
-            }
-        });
+    function onTimerCheck ()
+    {
+        if (finishCnt < 2)
+            return;
+
+        knex('faculty')
+            .select()
+            .where('digest', digest)
+            .update('expire', false) //refreshes expiration since session is still valid.
+            .then((frows) => {
+                if (frows.length > 0)
+                {
+                    var retObj = {
+                        email: frows[0].email,
+                        accType: frows[0].accType,
+                        name: frows[0].name
+                    };
+                    cb(retObj);
+                }
+                else
+                {
+                    knex('patients')
+                        .select()
+                        .where('digest', digest)
+                        .update('expire', false) //refreshes expiration since session is still valid.
+                        .then((prows) => {
+                            if (prows.length > 0)
+                            {
+                                var retObj = {
+                                    email: prows[0].email,
+                                    accType: 'patient',
+                                    patientID: prows[0].id
+                                };
+                                cb(retObj);
+                            }
+                            else
+                            {
+                                cb({err: 'Invalid Auth Code'});
+                            }
+                        });
+                }
+            });
+    }
 }
 
 function revokeAuthentication (knex, req, res)
