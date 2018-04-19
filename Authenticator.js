@@ -259,11 +259,16 @@ function getRequestor (knex, req, cb)
         if (finishCnt < 2)
             return;
 
+        //console.log('Body:');
+        //console.log(req.body);
+        //console.log('Hash:');
+        //console.log(digest);
+
         knex('faculty')
             .select()
             .where('digest', digest)
-            .update('expire', false) //refreshes expiration since session is still valid.
             .then((frows) => {
+                //console.log(frows);
                 if (frows.length > 0)
                 {
                     var retObj = {
@@ -272,13 +277,16 @@ function getRequestor (knex, req, cb)
                         name: frows[0].name
                     };
                     cb(retObj);
+                    knex('faculty')
+                        .where('digest', digest)
+                        .update('expire', false) //refreshes expiration since session is still valid.
+                        .then(() => {});
                 }
                 else
                 {
                     knex('patients')
                         .select()
                         .where('digest', digest)
-                        .update('expire', false) //refreshes expiration since session is still valid.
                         .then((prows) => {
                             if (prows.length > 0)
                             {
@@ -288,6 +296,10 @@ function getRequestor (knex, req, cb)
                                     patientID: prows[0].id
                                 };
                                 cb(retObj);
+                                knex('patients')
+                                    .where('digest', digest)
+                                    .update('expire', false) //refreshes expiration since session is still valid.
+                                    .then(() => {});
                             }
                             else
                             {

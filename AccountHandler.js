@@ -107,6 +107,8 @@ function sendEmail (knex, req, res)
         }
 
         fromEmail = requestor.email;
+        if (body.hasOwnProperty('doctorEmail'))
+            fromEmail = body.doctorEmail;
 
         var randStr = randomstring.generate(64);
 

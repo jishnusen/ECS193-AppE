@@ -77,6 +77,31 @@ app.post('/fetch/doctors', function (req, res, next) {
     }
 });
 
+app.post('/fetch/patientMeta', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+    
+    var hasProps = util.checkProperties(['authCode'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType == 'admin' || requestor.accType == 'adminDoctor')
+            FetchRequestHandler.fetchPatientMetaData(knex, req, res);
+        else
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+    }
+});
+
 
 /**
 *   This site takes a POST request and returns the id corresponding to the email given in the 'email' property

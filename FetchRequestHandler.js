@@ -17,8 +17,35 @@ function fetchDoctors (knex, req, res)
             this.where('accType', 'doctor').orWhere('accType', 'adminDoctor')
         })
         .then(function (results) {
-            var emails = results.map((row) => { return row.email; });
-            util.respond(res, 200, JSON.stringify({emails: emails}));
+            util.respond(res, 200, JSON.stringify(results));
+        });
+}
+
+/**
+*	This function processes the POST request and sends a POST to the SQL database to SELECT patients from the appropriate table.
+*	After retrieveing the data, knex will send a call back returning a HTTP 200 status code and the data requested.
+* 	@param knex - connector between AppEngine and MySQL
+*	@param req  - the POST request
+*   @param res  - the POST response
+**/
+function fetchPatientMetaData (knex, req, res)
+{
+    knex('patients')
+        .select()
+        .then(function (results) {
+            var resObj = {meta: []};
+            for (var i = 0; i < results.length; i++)
+            {
+                var pat = {
+                    id: results[i].id,
+                    name: '',
+                    email: results[i].email,
+                    doctorEmail: results[i].doctorEmail
+                };
+                //console.log(pat);
+                resObj.meta.push(pat);
+            }
+            util.respond(res, 200, JSON.stringify(resObj));
         });
 }
 
@@ -78,7 +105,9 @@ function fetchReadings (knex, req, res)
         .select()
         .from('patient_' + data.id)
         .then(function (results) {
-            var csv = '';
+            var ret = {
+                csv: ''
+            };
             var cnt = 0;
             Array.prototype.forEach.call(results, function (row)
             {
@@ -93,9 +122,9 @@ function fetchReadings (knex, req, res)
                 cnt++;
                 if (cnt != results.length)
                     rowParse += '\n';
-                csv += rowParse;
+                ret.csv += rowParse;
             });
-            util.respond(res, 200, csv);
+            util.respond(res, 200, ret);
         });
 }
 
@@ -137,6 +166,7 @@ function fetchReadingsSize (knex, req, res, ids)
 }
 
 module.exports.fetchDoctors = fetchDoctors;
+module.exports.fetchPatientMetaData = fetchPatientMetaData;
 module.exports.fetchIDfromEmail = fetchIDfromEmail;
 module.exports.fetchDoctorPatients = fetchDoctorPatients;
 module.exports.fetchReadings = fetchReadings;
