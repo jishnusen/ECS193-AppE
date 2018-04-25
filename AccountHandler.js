@@ -75,7 +75,8 @@ function sendEmail (knex, req, res)
 
     var newAccType = body.newAccType;
     var toEmail = body.recipientEmail;
-    var toName = body.recipientName;
+    var toFamilyName = body.recipientFamilyName;
+    var toGivenName = body.recipientGivenName;
     var fromEmail = '';
 
     checkAccountExists(knex, toEmail, accExistance);
@@ -124,7 +125,7 @@ function sendEmail (knex, req, res)
                 },
                 'To': [{
                     'Email': toEmail,
-                    'Name': toName
+                    'Name': toGivenName + ' ' + toFamilyName
                 }],
                 'Subject': 'Account Activation',
                 'TextPart': randStr,
@@ -173,7 +174,8 @@ function sendEmail (knex, req, res)
                     code: str,
                     from: fromEmail,
                     to: toEmail,
-                    name: toName,
+                    familyName: toFamilyName,
+                    givenName: toGivenName,
                     accType: newAccType
                 };
 
@@ -224,13 +226,15 @@ function insertVerify (knex, req, res)
         var accType = row.accType;
         var email = row.to;
         var parent = row.from;
-        var name = row.name;
+        var familyName = row.familyName;
+        var givenName = row.givenName;
 
         if (accType == 'adminDoctor' || accType == 'admin' || accType == 'doctor')
         {
             var data = {
                 email: email,
-                name: name,
+                familyName: familyName,
+                givenName: givenName,
                 accType: accType
             };
             InsertRequestHandler.insertFaculty(knex, data, res);
@@ -239,6 +243,8 @@ function insertVerify (knex, req, res)
         {
             var data = {
                 email: email,
+                familyName: familyName,
+                givenName: givenName,
                 doctorEmail: parent,
                 param: 0
             };
