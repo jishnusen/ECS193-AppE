@@ -38,7 +38,8 @@ function fetchPatientMetaData (knex, req, res)
             {
                 var pat = {
                     id: results[i].id,
-                    name: '',
+                    familyName: results[i].familyName,
+					givenName: results[i].givenName,
                     email: results[i].email,
                     doctorEmail: results[i].doctorEmail
                 };
