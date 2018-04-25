@@ -365,7 +365,7 @@ app.post('/token/exchange', function (req, res, next) {
 app.post('/account/sendEmail', jsonParser, function (req, res, next) {
     if (!req.is('application/json'))
         return next();
-    var hasProps = util.checkProperties(['authCode', 'newAccType', 'recipientEmail', 'recipientName'], req.body);
+    var hasProps = util.checkProperties(['authCode', 'newAccType', 'recipientEmail', 'recipientFamilyName', 'recipientGivenName'], req.body);
     if (!hasProps)
         util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
     else
