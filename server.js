@@ -293,7 +293,7 @@ app.post('/transfer/patient', function (req, res, next) {
     if(!req.is('application/json'))
         return next();
     
-    var hasProps = util.checkProperties(['authCode', 'id', 'doctor'], req.body);
+    var hasProps = util.checkProperties(['authCode', 'id', 'destination'], req.body);
     if (!hasProps)
         util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
     else
@@ -307,33 +307,15 @@ app.post('/transfer/patient', function (req, res, next) {
             return;
         }
 
-        if ( requestor.accType == 'admin' && requestor.accType == 'adminDoctor')
+        if (requestor.accType == 'admin' || requestor.accType == 'adminDoctor')
         {
-            if(res.body.doctorEmail == '') //retire
-            {
-                knex('patients')
+            knex('patients')
                 .select()
                 .where('id', req.body.id)
-                .update({'doctorEmail': ''})
-                .then(() => {});    
-            }
-            else {
-                knex('faculty')
-                .select()
-                .where('doctorEmail', res.body.doctorEmail)
-                .then( (rows) =>{
-                    if(row.length == 1)
-                    {
-                        knex('patients')
-                        .select()
-                        .where('id', req.body.id)
-                        .update({'doctorEmail': res.body.doctorEmail})
-                        .then(() => {
-                            util.respond(res, 200, JSON.stringify({"OK":200}));
-                        });    
-                    }
+                .update('doctorEmail', req.body.destination)
+                .then(() => {
+                    util.respond(res, 401, JSON.stringify({body: 'Transfer Successful'}));
                 });
-            }
         }
         else{
             util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));

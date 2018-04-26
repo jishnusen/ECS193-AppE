@@ -115,7 +115,8 @@ function sendEmail (knex, req, res)
 
         updateVerifyLink(randStr);
 
-        var host = 'https://majestic-legend-193620.appspot.com';
+        //var host = 'https://majestic-legend-193620.appspot.com';
+        var host = 'http://localhost:8080';
 
         var mailData = {
             'Messages': [{
@@ -235,7 +236,9 @@ function insertVerify (knex, req, res)
                 email: email,
                 familyName: familyName,
                 givenName: givenName,
-                accType: accType
+                accType: accType,
+                digest: 'null',
+                expire: 0
             };
             InsertRequestHandler.insertFaculty(knex, data, res);
         }
@@ -246,6 +249,8 @@ function insertVerify (knex, req, res)
                 familyName: familyName,
                 givenName: givenName,
                 doctorEmail: parent,
+                digest: 'null',
+                expire: 0,
                 param: 0
             };
             InsertRequestHandler.insertPatient(knex, data, res);

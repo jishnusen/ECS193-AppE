@@ -13,6 +13,7 @@ const util = require('./util.js');
 **/
 function insertPatient (knex, data, res)
 {
+	//console.log('insertPatient');
 	knex('faculty')
 		.where('email', data.doctorEmail)
 		.catch((err) => console.log(err))
