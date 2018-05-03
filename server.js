@@ -367,19 +367,56 @@ app.post('/transfer/patient', function (req, res, next) {
     } 
 });
 
-//TOKENS -OLD
-
-/*
-app.post('/check/token', jsonParser, function (req, res, next) {
-    if(!req.is('application/json'))
+app.post('/remove/patient', function (req, res, next) {
+    if (!req.is('application/json'))
         return next();
-    Authenticator.checkUserExists(knex, req, res);
-});
+    
+    var hasProps = util.checkProperties(['authCode', 'id'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+    
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
 
-app.post('/token/exchange', function (req, res, next) {
-    if(!req.is('application/json'))
-        return next();
-    Authenticator.exchangeAuthCode(knex, req, res);
+        if (requestor.accType == 'admin' || requestor.accType == 'adminDoctor')
+        {
+            knex('patients')
+                .select()
+                .where('id', req.body.id)
+                .then((rows) => {
+                    if (rows.length > 0)
+                    {
+                        var pat = rows[0];
+                        if (pat.doctorEmail == '')
+                        {
+                            knex('patients')
+                                .where('id', req.body.id)
+                                .del()
+                                .then(() => {});
+                            knex.schema
+                                .dropTableIfExists('patient_' + req.body.id)
+                                .then(() => {});
+                            util.respond(res, 200, JSON.stringify({body: 'Remove Success'}));
+                        }
+                        else
+                            util.respond(res, 400, JSON.stringify({err: 'Cannot remove assigned patient. Unassign then try again.'}));
+                    }
+                    else
+                        util.respond(res, 400, JSON.stringify({err: 'Bad id'}));
+                });
+        }
+        else{
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            return;
+        }
+    }
 });
 */
 
