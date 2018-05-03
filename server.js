@@ -418,7 +418,49 @@ app.post('/remove/patient', function (req, res, next) {
         }
     }
 });
-*/
+
+app.post('/remove/doctor', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+    
+    var hasProps = util.checkProperties(['authCode', 'email'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+    
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType == 'admin' || requestor.accType == 'adminDoctor')
+        {
+            knex('faculty')
+                .select()
+                .where('email', req.body.email)
+                .then((rows) => {
+                    if (rows.length > 0)
+                    {
+                        knex('faculty')
+                            .where('email', req.body.email)
+                            .del()
+                            .then(() => {});
+                        util.respond(res, 200, JSON.stringify({body: 'Remove Success'}));
+                    }
+                    else
+                        util.respond(res, 400, JSON.stringify({err: 'Bad email'}));
+                });
+        }
+        else{
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            return;
+        }
+    }
+});
 
 //ACCOUNT
 
