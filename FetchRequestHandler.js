@@ -166,9 +166,64 @@ function fetchReadingsSize (knex, req, res, ids)
         });
 }
 
+
+/**
+*	This function processes the POST request and sends a POST to the SQL database to SELECT readings WHERE the id matches the one specified in the request body.
+*	After retrieveing the data, knex will send a call back returning a HTTP 200 status code and the SIZE of the data requested.
+* 	@param knex - connector between AppEngine and MySQL
+*	@param req  - the POST request
+*   @param res  - the POST response
+**/
+function fetchReadingsLimited (knex, req, res)
+{
+    var data = req.body;
+    
+        knex
+            .select()
+            .from('patient_' + data.id)
+            .limit(1400) //assuming 4 readings every hour, 1344 readings in 14 days should be the upper limit assuming 1 reading every 15 minutes.
+            .then(function (results) {
+                var ret = {
+                    csv: ''
+                };
+                var cnt = 0;
+                var temp = new Date(Date.now());
+                temp.setDate( temp.getDay() - 14);
+                var fourteenDaysAgo = Date.parse(temp);
+                console.log(fourteenDaysAgo);
+                Array.prototype.forEach.call(results, function (row)
+                {
+                    //TODO: remove data older than 14 days.
+                    console.log(Date.parse(row.timestamp));
+                    if(fourteenDaysAgo < Date.parse(row.timestamp))
+                    {
+                        var ts = Date.parse(row.timestamp);
+                        console.log(row.timestamp);
+                        //console.log(ts.UTC());
+                        var rowParse = '';
+                        for (var key in row)
+                        {
+                            if (key == 'timestamp')
+                                rowParse += row[key];
+                            else
+                                rowParse += ',' + row[key];
+                        }
+                        cnt++;
+                        if (cnt != results.length)
+                            rowParse += '\n';
+                        ret.csv += rowParse;
+                            
+                    }
+                });
+                util.respond(res, 200, ret);
+            });
+}
+
+
 module.exports.fetchDoctors = fetchDoctors;
 module.exports.fetchPatientMetaData = fetchPatientMetaData;
 module.exports.fetchIDfromEmail = fetchIDfromEmail;
 module.exports.fetchDoctorPatients = fetchDoctorPatients;
 module.exports.fetchReadings = fetchReadings;
 module.exports.fetchReadingsSize = fetchReadingsSize;
+module.exports.fetchReadingsLimited = fetchReadingsLimited;

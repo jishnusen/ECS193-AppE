@@ -216,6 +216,54 @@ app.post('/fetch/readings', function (req, res, next) {
     }
 });
 
+/**
+*   This site takes a POST request for the readings for the id specified in the 'id' property of the request body.
+*   example post body: {id: 1234}
+**/
+app.post('/mobile/readings', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+
+    var hasProps = util.checkProperties(['authCode', 'id'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType == 'admin')
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            return;
+        }
+
+        knex('patients')
+            .select()
+            .where('id', req.body.id)
+            .then((rows) => {
+                if (rows.length == 1)
+                {
+                    if (requestor.accType != 'patient')
+                    {
+                        if (rows[0].doctorEmail == requestor.email)
+                            FetchRequestHandler.fetchReadingsLimited(knex, req, res);
+                        else
+                            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                    }
+                }
+                else
+                    util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+            });
+    }
+});
+
 
 //INSERTS
 
@@ -272,6 +320,16 @@ app.post('/insert/reading', function (req, res, next) {
     } 
 });
 
+/**
+ *  This site processes a post request and changes doctor for patient in databse.
+ *  example post body:
+ * {
+ *   authCode: ****,
+ *   id: 0,
+ *   doctor email: **** 
+ *   
+ * }
+ */
 app.post('/transfer/patient', function (req, res, next) {
     if(!req.is('application/json'))
         return next();
@@ -304,6 +362,8 @@ app.post('/transfer/patient', function (req, res, next) {
             util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
             return;
         }
+
+
     } 
 });
 
@@ -358,6 +418,7 @@ app.post('/remove/patient', function (req, res, next) {
         }
     }
 });
+*/
 
 //ACCOUNT
 
