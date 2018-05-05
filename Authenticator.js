@@ -145,7 +145,9 @@ function getAuthForToken (knex, req, res)
             retObj.name = cbRes.name;
         if (accType == 'patient')
             retObj.id = cbRes.patientID;
-        addAuthentication(knex, email, accType, digest, addCB);
+        
+        LoginSweeper(cb);
+        function cb() { addAuthentication(knex, email, accType, digest, addCB); }
     }
 
     function addCB (cbRes)
@@ -190,19 +192,8 @@ function addAuthentication (knex, email, accType, digest, cb)
         });
 }
 
-/**
- * Validates digest
- * @param {*} knex  - database handler
- * @param {*} req - request body
- * @param {*} cb - funct to call on success
- */
-function getRequestor (knex, req, cb)
+function LoginSweeper (cb)
 {
-    var authCode = req.body.authCode;
-    var hash = crypto.createHash('sha256');
-    hash.update(authCode, 'utf8');
-    var digest = hash.digest('hex');
-
     var curTime = Date.now();
     var lastPlusThirty = lastCheckedTime + thirtyMinutes;
     var lastPlusSixty = lastCheckedTime + sixtyMinutes;
@@ -254,11 +245,31 @@ function getRequestor (knex, req, cb)
         onTimerCheck();
     }
 
-    function onTimerCheck ()
+    function onTimerCheck()
     {
         if (finishCnt < 2)
             return;
+        cb();
+    }
+}
 
+/**
+ * Validates digest
+ * @param {*} knex  - database handler
+ * @param {*} req - request body
+ * @param {*} cb - funct to call on success
+ */
+function getRequestor (knex, req, cb)
+{
+    var authCode = req.body.authCode;
+    var hash = crypto.createHash('sha256');
+    hash.update(authCode, 'utf8');
+    var digest = hash.digest('hex');
+
+    LoginSweeper(onSweep);
+
+    function onSweep ()
+    {
         //console.log('Body:');
         //console.log(req.body);
         //console.log('Hash:');
