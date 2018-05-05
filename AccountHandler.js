@@ -158,16 +158,14 @@ function sendEmail (knex, req, res)
             {
                 knex('pendingVerification')
                     .where('to', toEmail)
-                    .update('code', str)
+                    .update({
+                        code: str,
+                        from: fromEmail,
+                        familyName: toFamilyName,
+                        givenName: toGivenName,
+                        accType: newAccType
+                    })
                     .then(function() {});
-                knex('pendingVerification')
-                    .where('to', toEmail)
-                    .update('from', fromEmail)
-                    .then(function() {});
-                knex('pendingVerification')
-                    .where('to', toEmail)
-                    .update('accType', newAccType)
-                    .then(function() { /*console.log('Updated');*/ });
             }
             else
             {

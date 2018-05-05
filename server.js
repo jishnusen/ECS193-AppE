@@ -442,13 +442,90 @@ app.post('/remove/doctor', function (req, res, next) {
             knex('faculty')
                 .select()
                 .where('email', req.body.email)
+                .andWhere(() => {
+                    this.where('accType', 'doctor').orWhere('accType', 'adminDoctor');
+                })
                 .then((rows) => {
                     if (rows.length > 0)
                     {
-                        knex('faculty')
-                            .where('email', req.body.email)
-                            .del()
-                            .then(() => {});
+                        if (rows[0].accType == 'doctor')
+                        {
+                            knex('faculty')
+                                .where('email', req.body.email)
+                                .del()
+                                .then(() => {});
+                        }
+                        else if (rows[0].accType == 'adminDoctor')
+                        {
+                            knex('faculty')
+                                .where('email', req.body.email)
+                                .update({
+                                    accType: 'admin',
+                                    digest: 'null',
+                                    expire: false
+                                })
+                                .then(() => {});
+                        }
+                        util.respond(res, 200, JSON.stringify({body: 'Remove Success'}));
+                    }
+                    else
+                        util.respond(res, 400, JSON.stringify({err: 'Bad email'}));
+                });
+        }
+        else{
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            return;
+        }
+    }
+});
+
+app.post('/remove/admin', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+    
+    var hasProps = util.checkProperties(['authCode', 'email'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+    
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType == 'admin' || requestor.accType == 'adminDoctor')
+        {
+            knex('faculty')
+                .select()
+                .where('email', req.body.email)
+                .andWhere(() => {
+                    this.where('accType', 'admin').orWhere('accType', 'adminDoctor');
+                })
+                .then((rows) => {
+                    if (rows.length > 0)
+                    {
+                        if (rows[0].accType == 'admin')
+                        {
+                            knex('faculty')
+                                .where('email', req.body.email)
+                                .del()
+                                .then(() => {});
+                        }
+                        else if (rows[0].accType == 'adminDoctor')
+                        {
+                            knex('faculty')
+                                .where('email', req.body.email)
+                                .update({
+                                    accType: 'doctor',
+                                    digest: 'null',
+                                    expire: false
+                                })
+                                .then(() => {});
+                        }
                         util.respond(res, 200, JSON.stringify({body: 'Remove Success'}));
                     }
                     else
