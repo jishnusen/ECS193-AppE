@@ -216,6 +216,64 @@ app.post('/fetch/readings', function (req, res, next) {
     }
 });
 
+
+
+/**
+*   This site takes a POST request for the readings for the id specified in the 'id' property of the request body.
+*   example post body: {id: 1234}
+**/
+app.post('/fetch/events', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+
+    var hasProps = util.checkProperties(['authCode', 'id'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType == 'admin')
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            return;
+        }
+
+        knex('patients')
+            .select()
+            .where('id', req.body.id)
+            .then((rows) => {
+                if (rows.length == 1)
+                {
+                    if (requestor.accType != 'patient')
+                    {
+                        if (rows[0].doctorEmail == requestor.email)
+                            FetchRequestHandler.fetchLeakAndVoidEvents(knex, req, res);
+                        else
+                            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                    }
+                    else
+                    {
+                        if (rows[0].email == requestor.email)
+                            FetchRequestHandler.fetchLeakAndVoidEvents(knex, req, res);
+                        else
+                            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                    }
+                }
+                else
+                    util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+            });
+    }
+});
+
+
 /**
 *   This site takes a POST request for the readings for the id specified in the 'id' property of the request body.
 *   example post body: {id: 1234}

@@ -105,6 +105,7 @@ function fetchReadings (knex, req, res)
     knex
         .select()
         .from('patient_' + data.id)
+        .where('event', "reading")
         .then(function (results) {
             var ret = {
                 csv: ''
@@ -117,6 +118,8 @@ function fetchReadings (knex, req, res)
                 {
                     if (key == 'timestamp')
                         rowParse += row[key];
+                    else if(key=='event'||key=='amount')
+                        continue;
                     else
                         rowParse += ',' + row[key];
                 }
@@ -144,6 +147,7 @@ function fetchReadingsSize (knex, req, res, ids)
     knex
         .select()
         .from('patient_' + data.id)
+        .where('event', "reading")
         .then(function (results) {
             var csv = '';
             var cnt = 0;
@@ -154,6 +158,8 @@ function fetchReadingsSize (knex, req, res, ids)
                 {
                     if (key == 'timestamp')
                         rowParse += row[key];
+                    else if(key=='event'||key=='amount')
+                        continue;
                     else
                         rowParse += ',' + row[key];
                 }
@@ -178,47 +184,90 @@ function fetchReadingsLimited (knex, req, res)
 {
     var data = req.body;
     
-        knex
-            .select()
-            .from('patient_' + data.id)
-            .limit(1400) //assuming 4 readings every hour, 1344 readings in 14 days should be the upper limit assuming 1 reading every 15 minutes.
-            .then(function (results) {
-                var ret = {
-                    csv: ''
-                };
-                var cnt = 0;
-                var temp = new Date(Date.now());
-                temp.setDate( temp.getDay() - 14);
-                var fourteenDaysAgo = Date.parse(temp);
-                console.log(fourteenDaysAgo);
-                Array.prototype.forEach.call(results, function (row)
+    knex
+        .select()
+        .from('patient_' + data.id)
+        .where('event', "reading")
+        .limit(1400) //assuming 4 readings every hour, 1344 readings in 14 days should be the upper limit assuming 1 reading every 15 minutes.
+        .then(function (results) {
+            var ret = {
+                csv: ''
+            };
+            var cnt = 0;
+            var temp = new Date(Date.now());
+            temp.setDate( temp.getDay() - 14);
+            var fourteenDaysAgo = Date.parse(temp);
+            Array.prototype.forEach.call(results, function (row)
+            {
+                if(fourteenDaysAgo < Date.parse(row.timestamp))
                 {
-                    //TODO: remove data older than 14 days.
-                    console.log(Date.parse(row.timestamp));
-                    if(fourteenDaysAgo < Date.parse(row.timestamp))
+                    var ts = Date.parse(row.timestamp);
+                    var rowParse = '';
+                    for (var key in row)
                     {
-                        var ts = Date.parse(row.timestamp);
-                        console.log(row.timestamp);
-                        //console.log(ts.UTC());
-                        var rowParse = '';
-                        for (var key in row)
-                        {
-                            if (key == 'timestamp')
-                                rowParse += row[key];
-                            else
-                                rowParse += ',' + row[key];
-                        }
-                        cnt++;
-                        if (cnt != results.length)
-                            rowParse += '\n';
-                        ret.csv += rowParse;
-                            
+                        if (key == 'timestamp')
+                            rowParse += row[key];
+                        else if(key=='event'||key=='amount')
+                            continue;
+                        else
+                            rowParse += ',' + row[key];
                     }
-                });
-                util.respond(res, 200, ret);
+                    cnt++;
+                    if (cnt != results.length)
+                        rowParse += '\n';
+                    ret.csv += rowParse;
+                        
+                }
             });
+            util.respond(res, 200, ret);
+        });
 }
 
+/**
+ * This function proccesses the POST request and requests SQL to gather all information about leak and void events.
+ * After retrieving, returns a HTTP200 to indicate a successful operation and the required information
+ * @param knex - connector
+ * @param req - POST request
+ * @param res - POST response
+ */
+function fetchLeakAndVoidEvents(knex, req, res)
+{
+    var data = req.body;
+
+    knex
+        .select()
+        .from('patient_' + data.id)
+        .where('event', 'leak').orWhere('event', 'void')
+        .limit(300) //A reasonable upper limit (normal bathroom 4~10 times, this is at least 30 days)
+        .then(function (results) {
+            var ret = {
+                csv: ''
+            };
+            var cnt = 0;
+            Array.prototype.forEach.call(results, function (row)
+            {
+                
+                var ts = Date.parse(row.timestamp);
+                var rowParse = '';
+                for (var key in row)
+                {
+                    if (key == 'timestamp')
+                        rowParse += row[key];
+                    else if(key=='event'||key=='amount')
+                        rowParse += ',' + row[key];
+                    else
+                        continue;
+                
+                    }
+                cnt++;
+                if (cnt != results.length)
+                    rowParse += '\n';
+                ret.csv += rowParse;
+                 
+            });
+            util.respond(res, 200, ret);
+        });    
+}
 
 module.exports.fetchDoctors = fetchDoctors;
 module.exports.fetchPatientMetaData = fetchPatientMetaData;
@@ -227,3 +276,4 @@ module.exports.fetchDoctorPatients = fetchDoctorPatients;
 module.exports.fetchReadings = fetchReadings;
 module.exports.fetchReadingsSize = fetchReadingsSize;
 module.exports.fetchReadingsLimited = fetchReadingsLimited;
+module.exports.fetchLeakAndVoidEvents = fetchLeakAndVoidEvents;
