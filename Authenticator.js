@@ -146,7 +146,7 @@ function getAuthForToken (knex, req, res)
         if (accType == 'patient')
             retObj.id = cbRes.patientID;
         
-        LoginSweeper(cb);
+        LoginSweeper(knex, cb);
         function cb() { addAuthentication(knex, email, accType, digest, addCB); }
     }
 
@@ -191,9 +191,14 @@ function addAuthentication (knex, email, accType, digest, cb)
             }
         });
 }
-
-function LoginSweeper (cb)
+/**
+ * Kills timed out clients
+ * @param {*} cb - function call on success
+ */
+function LoginSweeper (knex, cb)
 {
+
+
     var curTime = Date.now();
     var lastPlusThirty = lastCheckedTime + thirtyMinutes;
     var lastPlusSixty = lastCheckedTime + sixtyMinutes;
@@ -266,7 +271,7 @@ function getRequestor (knex, req, cb)
     hash.update(authCode, 'utf8');
     var digest = hash.digest('hex');
 
-    LoginSweeper(onSweep);
+    LoginSweeper(knex ,onSweep);
 
     function onSweep ()
     {
