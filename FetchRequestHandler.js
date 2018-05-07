@@ -21,6 +21,17 @@ function fetchDoctors (knex, req, res)
         });
 }
 
+function fetchNotes (knex, req, res)
+{
+    var id = req.body.id;
+    var table = 'doctorNotes_' + id;
+    knex(table)
+        .select()
+        .then((rows) => {
+            util.respond(res, 200, JSON.stringify(rows));
+        });
+}
+
 /**
 *	This function processes the POST request and sends a POST to the SQL database to SELECT patients from the appropriate table.
 *	After retrieveing the data, knex will send a call back returning a HTTP 200 status code and the data requested.
@@ -38,6 +49,7 @@ function fetchPatientMetaData (knex, req, res)
             {
                 var pat = {
                     id: results[i].id,
+                    lastLogin: results[i].lastLogin,
                     familyName: results[i].familyName,
                     givenName: results[i].givenName,
                     email: results[i].email,
@@ -270,6 +282,7 @@ function fetchLeakAndVoidEvents(knex, req, res)
 }
 
 module.exports.fetchDoctors = fetchDoctors;
+module.exports.fetchNotes = fetchNotes;
 module.exports.fetchPatientMetaData = fetchPatientMetaData;
 module.exports.fetchIDfromEmail = fetchIDfromEmail;
 module.exports.fetchDoctorPatients = fetchDoctorPatients;

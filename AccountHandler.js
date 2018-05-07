@@ -256,5 +256,39 @@ function insertVerify (knex, req, res)
     }
 }
 
+function updateLastLogin (knex, requestor, res, respondFlag)
+{
+    var table = 'faculty';
+    if (requestor.accType == 'patient')
+        table = 'patients';
+
+    var date = new Date();
+    var y = date.getUTCFullYear();
+    var mo = date.getUTCMonth() + 1;
+    if (mo < 10)
+        mo = '0' + mo;
+    var d = date.getUTCDate();
+    if (d < 10)
+        d = '0' + d;
+    var h = date.getUTCHours();
+    if (h < 10)
+        h = '0' + h;
+    var mi = date.getUTCMinutes();
+    if (mi < 10)
+        mi = '0' + mi;
+    var s = date.getUTCSeconds();
+    if (s < 10)
+        s = '0' + s;
+    var time = y + '-' + mo + '-' + d + ' ' + h + ':' + mi + ':' + s;
+    
+    knex(table)
+        .where('email', requestor.email)
+        .update('lastLogin', time)
+        .then(() => {
+            if (respondFlag) util.respond(res, 200, JSON.stringify({body: 'Updated'}));
+        });
+}
+
 module.exports.sendEmail = sendEmail;
 module.exports.insertVerify = insertVerify;
+module.exports.updateLastLogin = updateLastLogin;
