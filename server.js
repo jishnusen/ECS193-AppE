@@ -316,7 +316,7 @@ app.post('/mobile/readings', function (req, res, next) {
         Authenticator.getRequestor(knex, req, gotRequestor);
 
     function gotRequestor (requestor)
-    {
+    {   
         if (requestor.hasOwnProperty('err'))
         {
             util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
@@ -328,7 +328,7 @@ app.post('/mobile/readings', function (req, res, next) {
             util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
             return;
         }
-
+        if(requestor.accType == 'doctor' || requestor.accType == 'adminDoctor'){
         knex('patients')
             .select()
             .where('id', req.body.id)
@@ -346,6 +346,27 @@ app.post('/mobile/readings', function (req, res, next) {
                 else
                     util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
             });
+        }
+        else
+        if(requestor.accType == 'patient')
+        {
+            knex('patients').select()
+            .where('id', requestor.patientID)
+            .then((rows) => {
+                if (rows.length == 1)
+                {
+                    if (rows[0].email == requestor.email)
+                        FetchRequestHandler.fetchReadingsLimited(knex, req, res);
+                    else
+                        util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                
+                }
+                else
+                    util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+            });
+        }
+        else
+            util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
     }
 });
 
