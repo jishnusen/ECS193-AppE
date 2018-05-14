@@ -7,6 +7,7 @@ const {google} = require('googleapis');
 const randomstring = require('randomstring');
 const util = require('./util.js');
 const crypto = require('crypto');
+const AccountHandler = require('./AccountHandler.js');
 
 var CLIENT_IDS = [];
 if (process.env.NODE_ENV != 'production')
@@ -135,18 +136,26 @@ function getAuthForToken (knex, req, res)
         hash.update(randStr, 'utf8');
         var digest = hash.digest('hex');
         retObj = {
+            id: -1,
             email: email,
             accType: accType,
             name: '',
-            id: -1,
             authCode: randStr
         };
         if (accType != 'patient')
+        {
             retObj.name = cbRes.name;
+            retObj.id = cbRes.id;
+        }
         if (accType == 'patient')
             retObj.id = cbRes.patientID;
         
         LoginSweeper(knex, cb);
+        var requestor = {
+            accType: accType,
+            email: email
+        };
+        AccountHandler.updateLastLogin(knex, requestor, null, false);
         function cb() { addAuthentication(knex, email, accType, digest, addCB); }
     }
 
@@ -180,8 +189,6 @@ function addAuthentication (knex, email, accType, digest, cb)
         .then((rows) => {
             if (rows.length == 0)
                 cb(false);
-            //else if (rows[0].digest != 'null')
-            //    cb(false);
             else
             {
                 knex(table)
@@ -197,8 +204,6 @@ function addAuthentication (knex, email, accType, digest, cb)
  */
 function LoginSweeper (knex, cb)
 {
-
-
     var curTime = Date.now();
     var lastPlusThirty = lastCheckedTime + thirtyMinutes;
     var lastPlusSixty = lastCheckedTime + sixtyMinutes;
@@ -213,7 +218,6 @@ function LoginSweeper (knex, cb)
             .update({'digest': 'null', 'expire': false})
             .then(() => {});
         lastCheckedTime = curTime;
-        cb({err: 'Invalid Auth Code'});
         return;
     }
     else if (lastPlusThirty < curTime)
@@ -290,7 +294,8 @@ function getRequestor (knex, req, cb)
                     var retObj = {
                         email: frows[0].email,
                         accType: frows[0].accType,
-                        name: frows[0].name
+                        name: frows[0].name,
+                        id: frows[0].id
                     };
                     cb(retObj);
                     knex('faculty')
@@ -380,7 +385,8 @@ function checkEmail (knex, email, cb)
             if (frows.length > 0)
                 cb({
                     accType: frows[0].accType,
-                    name: frows[0].name
+                    name: frows[0].name,
+                    id: frows[0].id
                 });
             else
             {

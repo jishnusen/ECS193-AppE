@@ -22,10 +22,7 @@ function insertPatient (knex, data, res)
 			{
 				if (rows[0].accType != 'doctor' && rows[0].accType != 'adminDoctor')
 				{
-					res.status(400)
-						.set('Content-Type', 'text/plain')
-						.send('Doctor does not exist.')
-						.end();
+					util.respond(res, 400, 'Doctor does not exist.');
 					return;
 				}
 
@@ -43,24 +40,20 @@ function insertPatient (knex, data, res)
 								knex.schema.
 									createTable(tableName, function(table) {
 										table.dateTime('timestamp').defaultTo(knex.fn.now()).primary();
+										table.string('event').notNullable();
+										table.float('amount');
 										for (var i = 0; i < 64; i++)
-											table.float('ch' + i).notNullable();
+											table.float('ch' + i);
 									})
 									.then(function() {
-										res.status(200)
-											.set('Content-Type', 'text/plain')
-											.send('Received: ' + JSON.stringify(data))
-											.end();
+										util.respond(res, 200, 'Received: ' + JSON.stringify(data));
 									});
 							});
 					});
 			}
 			else
 			{
-				res.status(400)
-					.set('Content-Type', 'text/plain')
-					.send('Doctor does not exist.')
-					.end();
+				util.respond(res, 400, 'Doctor does not exist.');
 			}
 		});
 }
@@ -80,22 +73,30 @@ function insertFaculty (knex, data, res)
 		.catch((err) => { console.log(err); })
 		.then(function(rows) {
 			if (rows.length >= 1)
-			{
-				res.status(400)
-					.set('Content-Type', 'text/plain')
-					.send('Faculty of same name already exists.')
-					.end();
-			}
+				util.respond(res, 400, 'Faculty of same name already exists.');
 			else
 			{
 				knex('faculty')
 					.insert(data)
 					.catch((err) => { console.log(err); })
 					.then(function() {
-						res.status(200)
-							.set('Content-Type', 'text/plain')
-							.send('Received: ' + JSON.stringify(data))
-							.end();
+						util.respond(res, 200, 'Received: ' + JSON.stringify(data));
+
+						if (data.accType == 'doctor' || data.accType == 'adminDoctor')
+						{
+							knex('faculty')
+								.orderBy('id', 'desc')
+								.limit(1)
+								.then(function(rows) {
+									var id = rows[0].id;
+									newTableName = 'doctorNotes_' + id;
+									knex.schema.createTable(newTableName, (table) => {
+										table.dateTime('timestamp').defaultTo(knex.fn.now()).primary();
+										table.integer('patientID').notNullable();
+										table.string('note');
+									}).then(() => {});
+								});
+						}
 					});
 			}
 		});
@@ -134,6 +135,7 @@ function insertReading (knex, req, res)
 	for (var i = 0; i < readings.length; i++)
 	{
 		var insertStr = '{"timestamp":"' + readings[i].timestamp + '",';
+		insertStr += '"event":"reading","amount":0,';
 		for (var j = 0; j < 63; j++)
 			insertStr += '"ch' + j + '":"' + readings[i].channels[j] + '",';
 		insertStr += '"ch63":"' + readings[i].channels[63] + '"}';
@@ -159,6 +161,22 @@ function insertReading (knex, req, res)
 	}
 }
 
+function insertNote (knex, req, res)
+{
+	var data = {
+		patientID: req.body.patientID,
+		note: req.body.note
+	};
+	var table = 'doctorNotes_' + req.body.id;
+
+	knex(table)
+		.insert(data)
+		.then(() => {
+			util.respond(res, 200, JSON.stringify({body: 'Insert Successful'}));
+		});
+}
+
 module.exports.insertPatient = insertPatient;
 module.exports.insertFaculty = insertFaculty;
 module.exports.insertReading = insertReading;
+module.exports.insertNote = insertNote;
