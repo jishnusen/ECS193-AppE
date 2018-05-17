@@ -422,61 +422,6 @@ app.post('/mobile/readings', function (req, res, next) {
     }
 });
 
-/**
-*   This site takes a POST request for the readings for the id specified in the 'id' property of the request body.
-*   example post body: {id: 1234}
-**/
-app.post('/mobile/feedback', function (req, res, next) {
-    if (!req.is('application/json'))
-        return next();
-
-    var hasProps = util.checkProperties(['authCode', 'timestamp', 'amount'], req.body);
-    if (!hasProps)
-        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
-    else
-        Authenticator.getRequestor(knex, req, gotRequestor);
-
-    function gotRequestor (requestor)
-    {   
-        if (requestor.hasOwnProperty('err'))
-        {
-            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
-            return;
-        }
-        if (requestor.accType == 'admin' || requestor.accType == 'adminDoctor')
-        {
-                // knex('patient_'+ req.body.id).select()
-                // .where({'timestamp': req.body.timestamp, 'event': 'void'})
-                // .update('amount', req.body.amount)
-                // .then((rows) => {
-                //     console.log(rows);
-                //     if (rows == 1)
-                //     {
-                //         util.respond(res, 200, "Success");
-                //     }
-                //     else
-                //         util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
-                // });
-
-            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
-            return;
-        }
-        else
-        if(requestor.accType == 'patient')
-        {
-            knex('patient_'+ requestor.patientID).select()
-            .where({'timestamp': req.body.timestamp, 'event': 'void'})
-            .update({'amount': req.body.amount})
-            .then((updateCount) => {
-                if (updateCount > 1)
-                    util.respond(res, 200, "Success");
-            });
-        }
-        else
-            util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
-    }
-});
-
 //INSERTS
 
 /**
