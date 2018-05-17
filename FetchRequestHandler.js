@@ -21,15 +21,41 @@ function fetchDoctors (knex, req, res)
         });
 }
 
+function fetchAdmins (knex, req, res)
+{
+    knex
+        .select()
+        .from('faculty')
+        .where(function() {
+            this.where('accType', 'admin').orWhere('accType', 'adminDoctor')
+        })
+        .then(function (results) {
+            util.respond(res, 200, JSON.stringify(results));
+        });
+}
+
 function fetchNotes (knex, req, res)
 {
     var id = req.body.id;
     var table = 'doctorNotes_' + id;
     knex(table)
         .select()
+        .where('type', 'note')
         .then((rows) => {
             util.respond(res, 200, JSON.stringify(rows));
         });
+}
+
+function fetchTags (knex, req, res)
+{
+    var id = req.body.id;
+    var table = 'doctorNotes_' + id;
+    knex(table)
+        .select()
+        .where('type', 'tag')
+        .then((rows) => {
+            util.respond(res, 200, JSON.stringify(rows));
+        })
 }
 
 /**
@@ -194,6 +220,27 @@ function fetchReadingsSize (knex, req, res, ids)
 *	@param req  - the POST request
 *   @param res  - the POST response
 **/
+
+/*
+function fetchReadingsLimited (knex, req, res)
+{
+    var data = req.body;
+    
+    knex
+        .select()
+        .from('patient_' + data.id)
+        .where('event', "reading")
+        .orderBy("timestamp", "asc")
+        .limit(1400) //assuming 4 readings every hour, 1344 readings in 14 days should be the upper limit assuming 1 reading every 15 minutes.
+        .then(function (results) {
+            var ret = {
+                csv: results
+            };
+            util.respond(res, 200, JSON.stringify(ret));
+        });
+}
+*/
+
 function fetchReadingsLimited (knex, req, res)
 {
     var data = req.body;
@@ -234,7 +281,7 @@ function fetchReadingsLimited (knex, req, res)
                         
                 }
             });
-            util.respond(res, 200, ret);
+            util.respond(res, 200, JSON.stringify(ret));
         });
 }
 
@@ -286,7 +333,9 @@ function fetchLeakAndVoidEvents(knex, req, res)
 }
 
 module.exports.fetchDoctors = fetchDoctors;
+module.exports.fetchAdmins = fetchAdmins;
 module.exports.fetchNotes = fetchNotes;
+module.exports.fetchTags = fetchTags;
 module.exports.fetchPatientMetaData = fetchPatientMetaData;
 module.exports.fetchIDfromEmail = fetchIDfromEmail;
 module.exports.fetchDoctorPatients = fetchDoctorPatients;

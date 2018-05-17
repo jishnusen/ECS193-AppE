@@ -77,6 +77,31 @@ app.post('/fetch/doctors', function (req, res, next) {
     }
 });
 
+app.post('/fetch/admins', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+
+    var hasProps = util.checkProperties(['authCode'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType != 'patient')
+            FetchRequestHandler.fetchAdmins(knex, req, res);
+        else
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+    }
+});
+
 app.post('/fetch/notes', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -104,6 +129,33 @@ app.post('/fetch/notes', function (req, res, next) {
     }
 });
 
+app.post('/fetch/tags', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+
+    var hasProps = util.checkProperties(['authCode', 'id'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType != 'doctor' && requestor.accType != 'adminDoctor')
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+        else if (requestor.id != req.body.id)
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+        else
+            FetchRequestHandler.fetchTags(knex, req, res);
+    }
+});
+
 app.post('/fetch/patientMeta', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -122,7 +174,7 @@ app.post('/fetch/patientMeta', function (req, res, next) {
             return;
         }
 
-        if (requestor.accType == 'admin' || requestor.accType == 'adminDoctor')
+        if (requestor.accType != 'patient')
             FetchRequestHandler.fetchPatientMetaData(knex, req, res);
         else
             util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
@@ -370,7 +422,6 @@ app.post('/mobile/readings', function (req, res, next) {
     }
 });
 
-
 //INSERTS
 
 /**
@@ -450,6 +501,33 @@ app.post('/insert/note', function (req, res, next) {
             util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
         else
             InsertRequestHandler.insertNote(knex, req, res);
+    }
+});
+
+app.post('/insert/tag', function (req, res, next) {
+    if(!req.is('application/json'))
+        return next();
+    
+    var hasProps = util.checkProperties(['authCode', 'id', 'patientID', 'tag'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType != 'doctor' && requestor.accType != 'adminDoctor')
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+        else if (requestor.id != req.body.id)
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+        else
+            InsertRequestHandler.insertUpdateTag(knex, req, res);
     }
 });
 
@@ -574,9 +652,13 @@ app.post('/remove/doctor', function (req, res, next) {
         {
             knex('faculty')
                 .select()
-                .where('email', req.body.email)
-                .andWhere(() => {
-                    this.where('accType', 'doctor').orWhere('accType', 'adminDoctor');
+                .where({
+                    accType: 'doctor',
+                    email: req.body.email
+                })
+                .orWhere({
+                    accType: 'adminDoctor',
+                    email: req.body.email
                 })
                 .then((rows) => {
                     if (rows.length > 0)
@@ -640,9 +722,13 @@ app.post('/remove/admin', function (req, res, next) {
         {
             knex('faculty')
                 .select()
-                .where('email', req.body.email)
-                .andWhere(() => {
-                    this.where('accType', 'admin').orWhere('accType', 'adminDoctor');
+                .where({
+                    accType: 'admin',
+                    email: req.body.email
+                })
+                .orWhere({
+                    accType: 'adminDoctor',
+                    email: req.body.email
                 })
                 .then((rows) => {
                     if (rows.length > 0)
@@ -675,6 +761,56 @@ app.post('/remove/admin', function (req, res, next) {
             util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
             return;
         }
+    }
+});
+
+app.post('/modify/faculty', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+    
+    var hasProps = util.checkProperties(['authCode', 'email', 'accType'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+    
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType != 'admin' && requestor.accType != 'adminDoctor')
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            return;
+        }
+
+        knex('faculty')
+            .where('email', req.body.email)
+            .update('accType', req.body.accType)
+            .then(() => {
+                if (req.body.accType == 'doctor' || req.body.accType == 'adminDoctor')
+                {
+                    knex('faculty')
+                        .select()
+                        .where('email', req.body.email)
+                        .then((rows) => {
+                            var id = rows[0].id;
+                            var newTableName = 'doctorNotes_' + id;
+                            knex.schema.createTable(newTableName, (table) => {
+                                table.increments('id').primary();
+                                table.dateTime('timestamp').defaultTo(knex.fn.now());
+                                table.string('type'),notNullable();
+                                table.integer('patientID').notNullable();
+                                table.string('note');
+                            }).then(() => {});
+                        });
+                }
+                util.respond(res, 200, JSON.stringify({body: 'Modification Successful'}));
+            });
     }
 });
 

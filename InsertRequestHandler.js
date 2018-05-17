@@ -91,7 +91,9 @@ function insertFaculty (knex, data, res)
 									var id = rows[0].id;
 									newTableName = 'doctorNotes_' + id;
 									knex.schema.createTable(newTableName, (table) => {
-										table.dateTime('timestamp').defaultTo(knex.fn.now()).primary();
+										table.increments('id').primary();
+										table.dateTime('timestamp').defaultTo(knex.fn.now());
+										table.string('type').notNullable();
 										table.integer('patientID').notNullable();
 										table.string('note');
 									}).then(() => {});
@@ -165,6 +167,7 @@ function insertNote (knex, req, res)
 {
 	var data = {
 		patientID: req.body.patientID,
+		type: 'note',
 		note: req.body.note
 	};
 	var table = 'doctorNotes_' + req.body.id;
@@ -176,7 +179,49 @@ function insertNote (knex, req, res)
 		});
 }
 
+function insertUpdateTag (knex, req, res)
+{
+	var table = 'doctorNotes_' + req.body.id;
+	var patientID = req.body.patientID;
+	var newTag = req.body.tag;
+
+	knex(table)
+		.select()
+		.where({
+			'type': 'tag',
+			'patientID': patientID
+		})
+		.then((rows) => {
+			if (rows.length > 0)
+			{
+				knex(table)
+					.where({
+						'type': 'tag',
+						'patientID': patientID
+					})
+					.update('note', newTag)
+					.then(() => {
+						util.respond(res, 200, JSON.stringify({body: 'Update Successful'}));
+					});
+			}
+			else
+			{
+				var data = {
+					type: 'tag',
+					patientID: patientID,
+					note: newTag
+				};
+				knex(table)
+					.insert(data)
+					.then(() => {
+						util.respond(res, 200, JSON.stringify({body: 'Insert Successful'}));
+					});
+			}
+		});
+}
+
 module.exports.insertPatient = insertPatient;
 module.exports.insertFaculty = insertFaculty;
 module.exports.insertReading = insertReading;
 module.exports.insertNote = insertNote;
+module.exports.insertUpdateTag = insertUpdateTag;
