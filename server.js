@@ -463,8 +463,9 @@ app.post('/mobile/feedback', function (req, res, next) {
         else
         if(requestor.accType == 'patient')
         {
+            console.log(requestor);
             if(util.checkProperties(['amount'], req.body))
-                knex('patient_'+ requestor.body.id).select()
+                knex('patient_'+ requestor.patientID).select()
                 .insert({'timestamp': req.body.timestamp, 'event': 'void', "amount": req.body.amount})
                 .then(() => {
                     util.respond(res, 200, "Success");
