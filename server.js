@@ -445,19 +445,19 @@ app.post('/mobile/feedback', function (req, res, next) {
         }
         if (requestor.accType == 'admin' || requestor.accType == 'adminDoctor')
         {
-            if(util.checkProperties(['amount'], req.body))
-                knex('patient_'+ req.body.id).select()
-                .insert({'timestamp': req.body.timestamp, 'event': 'void', "amount": req.body.amount})
-                .then(() => {
-                    util.respond(res, 200, "Success");
-                });
-            else    
-                knex('patient_'+ req.body.id).select()
-                .insert({'timestamp': req.body.timestamp, 'event': 'leak'})
-                .then(() => {
-                    util.respond(res, 200, "Success");
-                });
-            //util.respond(res,400, {"err": "Bad Credentials"});
+            // if(util.checkProperties(['amount'], req.body))
+            //     knex('patient_'+ req.body.id).select()
+            //     .insert({'timestamp': req.body.timestamp, 'event': 'void', "amount": req.body.amount})
+            //     .then(() => {
+            //         util.respond(res, 200, "Success");
+            //     });
+            // else    
+            //     knex('patient_'+ req.body.id).select()
+            //     .insert({'timestamp': req.body.timestamp, 'event': 'leak'})
+            //     .then(() => {
+            //         util.respond(res, 200, "Success");
+            //     });
+            util.respond(res,400, {"err": "Bad Credentials"});
             return;
         }
         else
