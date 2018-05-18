@@ -471,7 +471,7 @@ app.post('/mobile/feedback', function (req, res, next) {
                     util.respond(res, 200, "Success");
                 });
             else    
-                knex('patient_'+ requestor.body.id).select()
+                knex('patient_'+ requestor.patientID).select()
                 .insert({'timestamp': req.body.timestamp, 'event': 'leak'})
                 .then(() => {
                     util.respond(res, 200, "Success");
