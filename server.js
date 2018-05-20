@@ -181,6 +181,46 @@ app.post('/fetch/patientMeta', function (req, res, next) {
     }
 });
 
+app.post('/fetch/singleMeta', function (req, res, next) {
+    if (!req.is('application/json'))
+        return next();
+    
+    var hasProps = util.checkProperties(['authCode', 'id'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+
+    function gotRequestor (requestor)
+    {
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType == 'patient')
+        {
+            knex('patients')
+                .select()
+                .where('id', req.body.id)
+                .then((rows) => {
+                    if (rows.length == 1)
+                    {
+                        if (rows[0].email == requestor.email)
+                            FetchRequestHandler.fetchSingleMetaData(knex, rows[0], res);
+                        else
+                            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                    }
+                    else
+                        util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+                });
+        }
+        else
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+    }
+});
+
 
 /**
 *   This site takes a POST request and returns the id corresponding to the email given in the 'email' property

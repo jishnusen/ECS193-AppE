@@ -88,6 +88,30 @@ function fetchPatientMetaData (knex, req, res)
         });
 }
 
+function fetchSingleMetaData (knex, row, res)
+{
+    knex('faculty')
+        .select()
+        .where('email', row.doctorEmail)
+        .then((rows) => {
+            var retObj = {
+                familyName: row.familyName,
+                givenName: row.givenName,
+                email: row.email,
+                doctorFamilyName: '',
+                doctorGivenName: '',
+                doctorEmail: ''
+            };
+            if (rows.length != 0)
+            {
+                retObj.doctorFamilyName = rows[0].familyName;
+                retObj.doctorGivenName = rows[0].givenName;
+                retObj.doctorEmail = rows[0].email;
+            }
+            util.respond(res, 200, JSON.stringify(retObj));
+        });
+}
+
 /**
 *	This function processes the POST request and sends a POST to the SQL database to SELECT the id WHERE the email matches the specified email in the request body.
 *	After retrieveing the data, knex will send a call back returning a HTTP 200 status code and the data requested.
@@ -337,6 +361,7 @@ module.exports.fetchAdmins = fetchAdmins;
 module.exports.fetchNotes = fetchNotes;
 module.exports.fetchTags = fetchTags;
 module.exports.fetchPatientMetaData = fetchPatientMetaData;
+module.exports.fetchSingleMetaData = fetchSingleMetaData;
 module.exports.fetchIDfromEmail = fetchIDfromEmail;
 module.exports.fetchDoctorPatients = fetchDoctorPatients;
 module.exports.fetchReadings = fetchReadings;
