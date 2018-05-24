@@ -70,10 +70,7 @@ app.post('/fetch/doctors', function (req, res, next) {
             return;
         }
 
-        if (requestor.accType != 'patient')
-            FetchRequestHandler.fetchDoctors(knex, req, res);
-        else
-            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+        FetchRequestHandler.fetchDoctors(knex, req, res);
     }
 });
 
@@ -843,7 +840,7 @@ app.post('/modify/faculty', function (req, res, next) {
                             knex.schema.createTable(newTableName, (table) => {
                                 table.increments('id').primary();
                                 table.dateTime('timestamp').defaultTo(knex.fn.now());
-                                table.string('type'),notNullable();
+                                table.string('type').notNullable();
                                 table.integer('patientID').notNullable();
                                 table.string('note');
                             }).then(() => {});
