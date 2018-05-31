@@ -2,6 +2,7 @@ const process = require('process');
 const express = require('express');
 const Knex = require('knex');
 const https = require('https');
+const moment = require('moment');
 
 const util = require('./util.js');
 const FetchRequestHandler = require('./FetchRequestHandler.js');
@@ -30,7 +31,7 @@ function Connect () //establish connection with database
         timezone: 'UTC',
         typeCast: function (field, next) {
             if (field.type == 'DATETIME') {
-            return moment(field.string()).format('YYYY-MM-DD HH:mm:ss');
+            return moment(field.string()).format('YYYY-MM-DD hh:mm:ss');
             }
             return next();
         }
@@ -277,10 +278,7 @@ app.post('/fetch/doctorList', function (req, res, next) {
             return;
         }
 
-        if (requestor.accType != 'patient')
-            FetchRequestHandler.fetchDoctorPatients(knex, requestor.email, res);
-        else
-            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+        FetchRequestHandler.fetchDoctorPatients(knex, requestor.email, res);
     }
 });
 
@@ -869,10 +867,12 @@ app.post('/remove/admin', function (req, res, next) {
     }
 });
 
+/**
+ * If not already requested, a request in doctor change will add a new request to the "patientrequest" list in the MySQL server
+ */
 app.post('/request/doctorchange', function(req, res, next){
     if (!req.is('application/json'))
         return next();
-    
     var hasProps = util.checkProperties(['authCode'], req.body);
     if (!hasProps)
         util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
@@ -881,6 +881,7 @@ app.post('/request/doctorchange', function(req, res, next){
 	
     function gotRequestor (requestor)
     {   
+        
         if (requestor.hasOwnProperty('err'))
         {
             util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
@@ -901,7 +902,7 @@ app.post('/request/doctorchange', function(req, res, next){
                     knex('patientsrequest').select()
                     .insert({'id':requestor.patientID, 'requestType':"doctorChange"})
                     .then((rows) => {
-                        util.respond(res, 200, JSON.stringify({err: 'OK'}));
+                        util.respond(res, 200, JSON.stringify({"result": 'OK'}));
 
                     });
                 else{
@@ -914,7 +915,7 @@ app.post('/request/doctorchange', function(req, res, next){
             util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
     }
     
-}
+});
 
 app.post('/modify/faculty', function (req, res, next) {
     if (!req.is('application/json'))
