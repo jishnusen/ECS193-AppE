@@ -895,12 +895,20 @@ app.post('/request/doctorchange', function(req, res, next){
         if(requestor.accType == 'patient')
         {
             knex('patientsrequest').select()
-            .insert({'id':requestor.patientID, 'requestType':"doctorChange"})
-            .then((rows) => {
-                
-                        util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
-                
-            });
+            .where({'id':requestor.patientID, 'requestType':"doctorChange"})
+            .then((rows)=>{
+                if(rows.length == 0) //check if it exists (also should never be >1 but robust programming!)
+                    knex('patientsrequest').select()
+                    .insert({'id':requestor.patientID, 'requestType':"doctorChange"})
+                    .then((rows) => {
+                        util.respond(res, 200, JSON.stringify({err: 'OK'}));
+
+                    });
+                else{
+                    util.respond(res, 401, JSON.stringify({err: 'Request already Exists'}));
+                }
+            })
+            
         }
         else
             util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
