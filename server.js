@@ -26,7 +26,14 @@ function Connect () //establish connection with database
     var config = { //make sure your environment variables are set. This is for creating the proxy connection
         user: process.env.SQL_USER,
         password: process.env.SQL_PASSWORD,
-        database: process.env.SQL_DATABASE
+        database: process.env.SQL_DATABASE,
+        timezone: 'UTC',
+        typeCast: function (field, next) {
+            if (field.type == 'DATETIME') {
+            return moment(field.string()).format('YYYY-MM-DD HH:mm:ss');
+            }
+            return next();
+        }
     };
     
      if (process.env.INSTANCE_CONNECTION_NAME && process.env.NODE_ENV === 'production') 
