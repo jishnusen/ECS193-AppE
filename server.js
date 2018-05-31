@@ -862,7 +862,7 @@ app.post('/remove/admin', function (req, res, next) {
     }
 });
 
-app.post('/request/doctorchange' function(req, res, next){
+app.post('/request/doctorchange', function(req, res, next){
     if (!req.is('application/json'))
         return next();
     
