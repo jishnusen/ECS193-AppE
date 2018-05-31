@@ -873,7 +873,7 @@ app.post('/request/doctorchange', function(req, res, next){
     if (!req.is('application/json'))
         return next();
     
-    var hasProps = util.checkProperties(['authCode', 'doctorName'], req.body);
+    var hasProps = util.checkProperties(['authCode'], req.body);
     if (!hasProps)
         util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
     else
