@@ -894,21 +894,13 @@ app.post('/request/doctorchange', function(req, res, next){
         }
         if(requestor.accType == 'patient')
         {
-		/* TODO: I don't know where to put the request in the SQL database
-            knex('patients').select()
-            .where('id', requestor.patientID)
+            knex('patientsrequest').select()
+            .insert({'id':requestor.patientID, 'requestType':"doctorChange"})
             .then((rows) => {
-                if (rows.length == 1)
-                {
-                    if (rows[0].email == requestor.email)
-                        FetchRequestHandler.fetchReadingsLimited(knex, req, res);
-                    else
+                
                         util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
                 
-                }
-                else
-                    util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
-            });*/
+            });
         }
         else
             util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
