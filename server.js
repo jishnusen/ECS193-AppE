@@ -869,6 +869,53 @@ app.post('/remove/admin', function (req, res, next) {
     }
 });
 
+app.post('/request/doctorchange' function(req, res, next){
+    if (!req.is('application/json'))
+        return next();
+    
+    var hasProps = util.checkProperties(['authCode', 'doctorName'], req.body);
+    if (!hasProps)
+        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
+    else
+        Authenticator.getRequestor(knex, req, gotRequestor);
+	
+    function gotRequestor (requestor)
+    {   
+        if (requestor.hasOwnProperty('err'))
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
+            return;
+        }
+
+        if (requestor.accType != 'patient')
+        {
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            return;
+        }
+        if(requestor.accType == 'patient')
+        {
+		/* TODO: I don't know where to put the request in the SQL database
+            knex('patients').select()
+            .where('id', requestor.patientID)
+            .then((rows) => {
+                if (rows.length == 1)
+                {
+                    if (rows[0].email == requestor.email)
+                        FetchRequestHandler.fetchReadingsLimited(knex, req, res);
+                    else
+                        util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                
+                }
+                else
+                    util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+            });*/
+        }
+        else
+            util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+    }
+    
+}
+
 app.post('/modify/faculty', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
