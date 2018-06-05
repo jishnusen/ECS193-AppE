@@ -512,6 +512,14 @@ app.post('/mobile/feedback', function (req, res, next) {
                 .then(() => {
                     util.respond(res, 200, "Success");
                 });
+            else if(util.checkProperties(['feedback'], req.body))
+            {
+                knex('patient_'+ requestor.patientID).select()
+                .update({'timestamp': req.body.timestamp, "feedback": req.body.feedback})
+                .then(() => {
+                    util.respond(res, 200, "Success");
+                });
+            }
             else    
                 knex('patient_'+ requestor.patientID).select()
                 .insert({'timestamp': req.body.timestamp, 'event': 'leak'})

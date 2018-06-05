@@ -43,7 +43,8 @@ function insertPatient (knex, data, res)
 										table.string('event').notNullable();
 										table.float('amount');
 										for (var i = 0; i < 64; i++)
-											table.float('ch' + i);
+											table.float('ch' + i)
+										table.integer('feedback');
 									})
 									.then(function() {
 										util.respond(res, 200, 'Received: ' + JSON.stringify(data));
