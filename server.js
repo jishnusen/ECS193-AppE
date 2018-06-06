@@ -530,7 +530,8 @@ app.post('/mobile/feedback', function (req, res, next) {
             else if(util.checkProperties(['feedback'], req.body))
             {
                 knex('patient_'+ requestor.patientID).select()
-                .update({'timestamp': req.body.timestamp, "feedback": req.body.feedback})
+                .where({'timestamp': req.body.timestamp} )
+                .update({"feedback": req.body.feedback})
                 .then(() => {
                     util.respond(res, 200, "Success");
                 });
