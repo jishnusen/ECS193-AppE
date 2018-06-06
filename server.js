@@ -31,7 +31,7 @@ function Connect () //establish connection with database
         timezone: 'UTC',
         typeCast: function (field, next) {
             if (field.type == 'DATETIME') {
-            return moment(field.string()).format('YYYY-MM-DD hh:mm:ss');
+            return moment(field.string()).format('YYYY-MM-DD HH:mm:ss');
             }
             return next();
         }
