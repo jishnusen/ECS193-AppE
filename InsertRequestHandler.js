@@ -45,6 +45,7 @@ function insertPatient (knex, data, res)
 										for (var i = 0; i < 64; i++)
 											table.float('ch' + i)
 										table.integer('feedback');
+										table.string('note');
 									})
 									.then(function() {
 										util.respond(res, 200, 'Received: ' + JSON.stringify(data));
@@ -167,11 +168,10 @@ function insertReading (knex, req, res)
 function insertNote (knex, req, res)
 {
 	var data = {
-		patientID: req.body.patientID,
-		type: 'note',
+		event: 'note',
 		note: req.body.note
 	};
-	var table = 'doctorNotes_' + req.body.id;
+	var table = 'patient_' + req.body.id;
 
 	knex(table)
 		.insert(data)

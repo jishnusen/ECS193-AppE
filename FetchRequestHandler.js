@@ -37,12 +37,23 @@ function fetchAdmins (knex, req, res)
 function fetchNotes (knex, req, res)
 {
     var id = req.body.id;
-    var table = 'doctorNotes_' + id;
+    var table = 'patient_' + id;
     knex(table)
         .select()
-        .where('type', 'note')
+        .where('event', 'note')
         .then((rows) => {
-            util.respond(res, 200, JSON.stringify(rows));
+            var resObj = {
+                notes: []
+            };
+            for (var i = 0; i < rows.length; i++)
+            {
+                var note = {
+                    timestamp: rows[i].timestamp,
+                    msg: rows[i].note
+                };
+                resObj.notes.push(note);
+            }
+            util.respond(res, 200, JSON.stringify(resObj));
         });
 }
 

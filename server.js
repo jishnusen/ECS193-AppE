@@ -126,11 +126,26 @@ app.post('/fetch/notes', function (req, res, next) {
         }
 
         if (requestor.accType != 'doctor' && requestor.accType != 'adminDoctor')
-            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
-        else if (requestor.id != req.body.id)
-            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials (1)'}));
         else
-            FetchRequestHandler.fetchNotes(knex, req, res);
+        {
+            knex('patients')
+                .select()
+                .where('id', req.body.id)
+                .then((rows) => {
+                    if (rows.length == 1)
+                    {
+                        //console.log(rows);
+                        //console.log(requestor);
+                        if (rows[0].doctorEmail == requestor.email)
+                            FetchRequestHandler.fetchNotes(knex, req, res);
+                        else
+                            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials (2)'}));
+                    }
+                    else
+                        util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+                });
+        }
     }
 });
 
@@ -592,7 +607,7 @@ app.post('/insert/note', function (req, res, next) {
     if(!req.is('application/json'))
         return next();
     
-    var hasProps = util.checkProperties(['authCode', 'id', 'patientID', 'note'], req.body);
+    var hasProps = util.checkProperties(['authCode', 'id', 'note'], req.body);
     if (!hasProps)
         util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
     else
@@ -608,10 +623,23 @@ app.post('/insert/note', function (req, res, next) {
 
         if (requestor.accType != 'doctor' && requestor.accType != 'adminDoctor')
             util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
-        else if (requestor.id != req.body.id)
-            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
         else
-            InsertRequestHandler.insertNote(knex, req, res);
+        {
+            knex('patients')
+                .select()
+                .where('id', req.body.id)
+                .then((rows) => {
+                    if (rows.length == 1)
+                    {
+                        if (rows[0].doctorEmail == requestor.email)
+                            InsertRequestHandler.insertNote(knex, req, res);
+                        else
+                            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
+                    }
+                    else
+                        util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
+                });
+        }
     }
 });
 

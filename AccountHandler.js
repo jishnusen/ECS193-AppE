@@ -116,7 +116,6 @@ function sendEmail (knex, req, res)
         updateVerifyLink(randStr);
 
         var host = 'https://majestic-legend-193620.appspot.com';
-        //var host = 'http://localhost:8080';
 
         var mailData = {
             'Messages': [{
@@ -130,7 +129,7 @@ function sendEmail (knex, req, res)
                 }],
                 'Subject': 'Account Activation',
                 'TextPart': randStr,
-                'HtmlPart': '<a href="' + host + '/account/validate?v=' + randStr + '">Hello There</a>'
+                'HtmlPart': 'To activate your NIBVA account, click<a href="' + host + '/account/validate?v=' + randStr + '">here</a>.'
             }]   
         };
 
