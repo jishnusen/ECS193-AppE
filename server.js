@@ -58,7 +58,10 @@ function Connect () //establish connection with database
 //FETCHES
 /**
 *   This site takes a POST request and returns the list of doctors registered in the database.
-*   example post body: none
+*   example post body:
+{
+    authCode: 'authCode'
+}
 **/
 app.post('/fetch/doctors', function (req, res, next) {
     if (!req.is('application/json'))
@@ -82,6 +85,13 @@ app.post('/fetch/doctors', function (req, res, next) {
     }
 });
 
+/**
+*   This site takes a POST request and returns the list of admins registered in the database.
+*   example post body:
+{
+    authCode: 'authCode'
+}
+**/
 app.post('/fetch/admins', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -107,6 +117,14 @@ app.post('/fetch/admins', function (req, res, next) {
     }
 });
 
+/**
+*   This site takes a POST request and returns the notes attributed to a given patient.
+*   example post body:
+{
+    authCode: 'authCode',
+    id: thePatientsID
+}
+**/
 app.post('/fetch/notes', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -149,6 +167,14 @@ app.post('/fetch/notes', function (req, res, next) {
     }
 });
 
+/**
+*   This site takes a POST request and returns the list tags the the doctor has.
+*   example post body:
+{
+    authCode: 'authCode',
+    id: theDoctorsID
+}
+**/
 app.post('/fetch/tags', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -176,6 +202,13 @@ app.post('/fetch/tags', function (req, res, next) {
     }
 });
 
+/**
+*   This site takes a POST request and returns the list of patient meta data.
+*   example post body:
+{
+    authCode: 'authCode'
+}
+**/
 app.post('/fetch/patientMeta', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -201,6 +234,14 @@ app.post('/fetch/patientMeta', function (req, res, next) {
     }
 });
 
+/**
+*   This site takes a POST request and returns a single patient's meta data.
+*   example post body:
+{
+    authCode: 'authCode',
+    id: thePatientsID
+}
+**/
 app.post('/fetch/singleMeta', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -244,13 +285,17 @@ app.post('/fetch/singleMeta', function (req, res, next) {
 
 /**
 *   This site takes a POST request and returns the id corresponding to the email given in the 'email' property
-*   example post body: {email: johnsmith@gmail.com}
+*   example post body: 
+{
+    authCode: 'authCode',
+    email: johnsmith@gmail.com
+}
 **/
 app.post('/fetch/idFromEmail', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
 
-    var hasProps = util.checkProperties(['authCode'], req.body);
+    var hasProps = util.checkProperties(['authCode', 'email'], req.body);
     if (!hasProps)
         util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
     else
@@ -273,13 +318,17 @@ app.post('/fetch/idFromEmail', function (req, res, next) {
 
 /**
 *   This site takes a POST request for the list of patients that are managed by the doctor specified in the 'doctor' property of the request body.
-*   example post body: {doctor: doctorname}
+*   example post body:
+{
+    authCode: 'authCode',
+    email: johnsmith@gmail.com
+}
 **/
 app.post('/fetch/doctorList', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
 
-    var hasProps = util.checkProperties(['authCode'], req.body);    
+    var hasProps = util.checkProperties(['authCode', 'email'], req.body);    
     if (!hasProps)
         util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
     else
@@ -299,7 +348,11 @@ app.post('/fetch/doctorList', function (req, res, next) {
 
 /**
 *   This site takes a POST request for the readings for the id specified in the 'id' property of the request body.
-*   example post body: {id: 1234}
+*   example post body: 
+{
+    authCode: 'authCode',
+    id: 1234
+}
 **/
 app.post('/fetch/readings', function (req, res, next) {
     if (!req.is('application/json'))
@@ -356,7 +409,11 @@ app.post('/fetch/readings', function (req, res, next) {
 
 /**
 *   This site takes a POST request for the readings for the id specified in the 'id' property of the request body.
-*   example post body: {id: 1234}
+*   example post body: 
+{
+    authCode: 'authCode',
+    id: 1234
+}
 **/
 app.post('/fetch/events', function (req, res, next) {
     if (!req.is('application/json'))
@@ -412,7 +469,11 @@ app.post('/fetch/events', function (req, res, next) {
 
 /**
 *   This site takes a POST request for the readings for the id specified in the 'id' property of the request body.
-*   example post body: {id: 1234}
+*   example post body: 
+{
+    authCode: 'authCode',
+    id: 1234
+}
 **/
 app.post('/mobile/readings', function (req, res, next) {
     if (!req.is('application/json'))
@@ -480,8 +541,25 @@ app.post('/mobile/readings', function (req, res, next) {
 });
 
 /**
-*   This site takes a POST request for the readings for the id specified in the 'id' property of the request body.
-*   example post body: {id: 1234}
+*   This site takes a POST request for inserting events or giving reading feedback.
+*   example post body: 
+for feedback
+{
+    authCode: 'authCode',
+    timestamp: 'readingTime',
+    feedback: 'feedback'
+}
+for void event
+{
+    authCode: 'authCode',
+    timestamp: 'readingTime',
+    amount: 'void amount'
+}
+for leak event
+{
+    authCode: 'authCode',
+    timestamp: 'readingTime'
+}
 **/
 app.post('/mobile/feedback', function (req, res, next) {
     if (!req.is('application/json'))
@@ -502,25 +580,11 @@ app.post('/mobile/feedback', function (req, res, next) {
         }
         if (requestor.accType == 'admin' || requestor.accType == 'adminDoctor')
         {
-            // if(util.checkProperties(['amount'], req.body))
-            //     knex('patient_'+ req.body.id).select()
-            //     .insert({'timestamp': req.body.timestamp, 'event': 'void', "amount": req.body.amount})
-            //     .then(() => {
-            //         util.respond(res, 200, "Success");
-            //     });
-            // else    
-            //     knex('patient_'+ req.body.id).select()
-            //     .insert({'timestamp': req.body.timestamp, 'event': 'leak'})
-            //     .then(() => {
-            //         util.respond(res, 200, "Success");
-            //     });
             util.respond(res,400, {"err": "Bad Credentials"});
             return;
         }
-        else
-        if(requestor.accType == 'patient')
+        else if(requestor.accType == 'patient')
         {
-            console.log(requestor);
             if(util.checkProperties(['amount'], req.body))
                 knex('patient_'+ requestor.patientID).select()
                 .insert({'timestamp': req.body.timestamp, 'event': 'void', "amount": req.body.amount})
@@ -604,6 +668,15 @@ app.post('/insert/reading', function (req, res, next) {
     } 
 });
 
+/**
+*   This site takes a POST request to inesrt a note for a patient.
+*   example post body: 
+{
+    authCode: 'authCode',
+    id: thePaitentID,
+    node: 'Some Note'
+}
+**/
 app.post('/insert/note', function (req, res, next) {
     if(!req.is('application/json'))
         return next();
@@ -644,6 +717,16 @@ app.post('/insert/note', function (req, res, next) {
     }
 });
 
+/**
+*   This site takes a POST request to inesrt/update a tag for a patient.
+*   example post body: 
+{
+    authCode: 'authCode',
+    id: theDoctorsID,
+    patientID: thePatientsID,
+    tag: 'Some Tag'
+}
+**/
 app.post('/insert/tag', function (req, res, next) {
     if(!req.is('application/json'))
         return next();
@@ -718,6 +801,14 @@ app.post('/transfer/patient', function (req, res, next) {
     } 
 });
 
+/**
+*   This site takes a POST request to remove a patient from the database.
+*   example post body: 
+{
+    authCode: 'authCode',
+    id: thePatientsID
+}
+**/
 app.post('/remove/patient', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -770,6 +861,15 @@ app.post('/remove/patient', function (req, res, next) {
     }
 });
 
+/**
+*   This site takes a POST request to remove a doctor from the database (if adminDoctor, then changes them to admin).
+*   example post body: 
+{
+    authCode: 'authCode',
+    id: theDoctorsID,
+    email: theDoctorsEmail
+}
+**/
 app.post('/remove/doctor', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -840,6 +940,14 @@ app.post('/remove/doctor', function (req, res, next) {
     }
 });
 
+/**
+*   This site takes a POST request to remove a admin from the database (if adminDoctor, then changes them to doctor).
+*   example post body: 
+{
+    authCode: 'authCode',
+    email: theAdminsEmail
+}
+**/
 app.post('/remove/admin', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -905,55 +1013,14 @@ app.post('/remove/admin', function (req, res, next) {
 });
 
 /**
- * If not already requested, a request in doctor change will add a new request to the "patientrequest" list in the MySQL server
- */
-app.post('/request/doctorchange', function(req, res, next){
-    if (!req.is('application/json'))
-        return next();
-    var hasProps = util.checkProperties(['authCode'], req.body);
-    if (!hasProps)
-        util.respond(res, 401, JSON.stringify({err: 'Bad Request'}));
-    else
-        Authenticator.getRequestor(knex, req, gotRequestor);
-	
-    function gotRequestor (requestor)
-    {   
-        
-        if (requestor.hasOwnProperty('err'))
-        {
-            util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
-            return;
-        }
-
-        if (requestor.accType != 'patient')
-        {
-            util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
-            return;
-        }
-        if(requestor.accType == 'patient')
-        {
-            knex('patientsrequest').select()
-            .where({'id':requestor.patientID, 'requestType':"doctorChange"})
-            .then((rows)=>{
-                if(rows.length == 0) //check if it exists (also should never be >1 but robust programming!)
-                    knex('patientsrequest').select()
-                    .insert({'id':requestor.patientID, 'requestType':"doctorChange"})
-                    .then((rows) => {
-                        util.respond(res, 200, JSON.stringify({"result": 'OK'}));
-
-                    });
-                else{
-                    util.respond(res, 401, JSON.stringify({err: 'Request already Exists'}));
-                }
-            })
-            
-        }
-        else
-            util.respond(res, 400, JSON.stringify({err: 'Bad ID'}));
-    }
-    
-});
-
+*   This site takes a POST request to change a staff members account.
+*   example post body: 
+{
+    authCode: 'authCode',
+    email: theStaffMembersEmail,
+    accType: accTypeToChangeTo
+}
+**/
 app.post('/modify/faculty', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -1006,6 +1073,17 @@ app.post('/modify/faculty', function (req, res, next) {
 
 //ACCOUNT
 
+/**
+*   This site takes a POST request to send an activation email.
+*   example post body: 
+{
+    authCode: 'authCode',
+    newAccType: 'patient',
+    recipientEmail: 'email1@email.com',
+    recipientFamilyName: 'LastName',
+    recipientGivenName: 'FirstName'
+}
+**/
 app.post('/account/sendEmail', jsonParser, function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -1016,10 +1094,20 @@ app.post('/account/sendEmail', jsonParser, function (req, res, next) {
         AccountHandler.sendEmail(knex, req, res);
 });
 
+/**
+*   This site takes the GET request found in the body of the activation email and create the new account.
+**/
 app.get('/account/validate', function (req, res, next) {
     AccountHandler.insertVerify(knex, req, res);
 });
 
+/**
+*   This site takes a POST request to update the requestors last login to the current time
+*   example post body: 
+{
+    authCode: 'authCode'
+}
+**/
 app.post('/account/updateLastLogin', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -1047,6 +1135,13 @@ app.post('/account/updateLastLogin', function (req, res, next) {
 
 //AUTHENTICATION
 
+/**
+*   This site takes a POST request to get an authentication code, given a valid google oauth access token.
+*   example post body: 
+{
+    accessToken: 'accessToken'
+}
+**/
 app.post('/security/getAuth', function (req, res, next) {
     if (!req.is('application/json'))
         return next();
@@ -1057,6 +1152,15 @@ app.post('/security/getAuth', function (req, res, next) {
         Authenticator.getAuthForToken(knex, req, res);
 });
 
+/**
+*   This site takes a POST request to log out an account (set their hash digest to null).
+*   example post body: 
+{
+    email: 'email1@email.com'
+    authCode: 'authCode'
+    accType: 'patient'
+}
+**/
 app.post('/security/revokeAuth', function (req, res, next) {
     if (!req.is('application.json'))
         return next();

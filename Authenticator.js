@@ -9,7 +9,9 @@ const util = require('./util.js');
 const crypto = require('crypto');
 const AccountHandler = require('./AccountHandler.js');
 
+//oauth client ids set for local testing
 var CLIENT_IDS = [];
+//NODE_ENV is set to 'production' when deployed on app engine, so this block only runs locally
 if (process.env.NODE_ENV != 'production')
 {
     process.env.CLIENT_ID = '671445578517-ogrl80hb1pnq5ruirarvjsmvd8th2hjp.apps.googleusercontent.com';
@@ -21,120 +23,71 @@ CLIENT_IDS = [process.env.CLIENT_ID, process.env.CLIENT_ELEC_ID];
 const auth = google.auth;
 var client = new auth.OAuth2(process.env.CLIENT_ID, process.env.CLIENT_WEB_SECRET, 'http://localhost');
 
-var lastCheckedTime = Date.now(); //implementation of "lazy timer"
-const thirtyMinutes = 1800000;
+var lastCheckedTime = Date.now(); //implementation of timer
+const thirtyMinutes = 1800000; //ms in 30 minutes
 const sixtyMinutes = thirtyMinutes*2;
 
-function exchangeAuthCode (knex, req, res)
-{
-    var accessToken = '';
-    var refreshToken = '';
-
-    client.getToken(req.body.authCode, function (err, tokens) {
-        if (err)
-        {
-            console.log(err);
-            util.respond(res, 400, JSON.stringify({err: 'Error getting tokens'}));
-            return;
-        }
-
-        accessToken = tokens.access_token;
-        refreshToken = tokens.refresh_token;
-
-        var httpsOptions = {
-            hostname: 'www.googleapis.com',
-            port: 443,
-            path: '/oauth2/v1/userinfo?access_token=' + accessToken,
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
-        };
-
-        var httpsReq = https.request(httpsOptions, httpsCB);
-        httpsReq.on('error', function(err) {
-            console.log('problem with request: ' + err.message);
-        });
-        httpsReq.end();
-    });
-
-    function httpsCB (cbRes)
-    {
-        cbRes.setEncoding('utf8');
-        cbRes.on('data', function (cbBody) {
-            var retObj = JSON.parse(cbBody);
-
-            if (retObj.hasOwnProperty('error'))
-            {
-                util.respond(res, 401, JSON.stringify({err: 'Invalid Token'}));
-                return;
-            }
-
-            var email = retObj.email;
-            knex('patients')
-                .select()
-                .where('email', email)
-                .then(function (rows) {
-                    if (rows.length == 0)
-                        util.respond(res, 401, JSON.stringify({err: 'Invalid Credentials'}));
-                    else
-                    {
-                        var data = {
-                            accessToken: accessToken,
-                            refreshToken: refreshToken,
-                            patientID: rows[0].id
-                        };
-                        util.respond(res, 200, JSON.stringify(data));
-                    }
-                });
-        });
-    }
-}
-
+/*
+ * Takes Google OAuth access token and returns a unique authorization code to be used for any future requests
+ * Called when a client is logging in
+ */
 function getAuthForToken (knex, req, res)
 {
     var accessToken = req.body.accessToken;
     var email = '';
     var retObj = null;
 
-    var httpsOptions = {
+    var httpsOptions = { //Object to send to googles servers to check for access token validity
         hostname: 'www.googleapis.com',
         port: 443,
-        path: '/oauth2/v1/userinfo?access_token=' + accessToken,
+        path: '/oauth2/v1/userinfo?access_token=' + accessToken, //path for site
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
     };
 
+    //sends https request with above object
     var httpsReq = https.request(httpsOptions, httpsCB);
     httpsReq.on('error', function(err) { console.log('problem with request: ' + err.message); });
     httpsReq.end();
 
+    //Called when receiving response from google servers
     function httpsCB (cbRes)
     {
         cbRes.setEncoding('utf-8');
         cbRes.on('data', function (cbBody) {
             var retObj = JSON.parse(cbBody);
-            if (retObj.hasOwnProperty('error'))
+            if (retObj.hasOwnProperty('error')) //if access token validation errored
                 util.respond(res, 400, JSON.stringify({err: 'Access Token Invalid'}));
             else
             {
+                //next check to make sure the email associated with the access token is in our database as a user
                 email = retObj.email;
                 checkEmail(knex, email, emailCB);
             }
         });
     }
 
+    //Called after checking if email exists as account
     function emailCB (cbRes)
     {
-        if (cbRes.hasOwnProperty('err'))
+        if (cbRes.hasOwnProperty('err')) //if email does not exist as a user in our database
         {
+            //send back error object
             util.respond(res, 401, JSON.stringify(cbRes));
             return;
         }
 
+        //create a random 32 alphanumeric character long string
+        //this will act somewhat like a symmetic key when making requests
         var accType = cbRes.accType;
         var randStr = randomstring.generate(32);
+
+        //hash the string using sha256
         var hash = crypto.createHash('sha256');
         hash.update(randStr, 'utf8');
         var digest = hash.digest('hex');
+
+        //setting the object we will return back to the client logging in
         retObj = {
             id: -1,
             email: email,
@@ -150,15 +103,21 @@ function getAuthForToken (knex, req, res)
         if (accType == 'patient')
             retObj.id = cbRes.patientID;
         
+        //Sweeps for inactive users in the database
         LoginSweeper(knex, cb);
+
+        //Logs this as the last time this client logged in
         var requestor = {
             accType: accType,
             email: email
         };
         AccountHandler.updateLastLogin(knex, requestor, null, false);
+
+        //Add the hash digest to the database for later client authentication
         function cb() { addAuthentication(knex, email, accType, digest, addCB); }
     }
 
+    //Callback for adding authentication to database
     function addCB (cbRes)
     {
         if (cbRes)
@@ -170,7 +129,6 @@ function getAuthForToken (knex, req, res)
 
 /**
  * Adds digest hash to database
- * Session is set to valid and will last 60 minutes
  * @param {*} knex - database handler
  * @param {*} email - user email
  * @param {*} accType - user account type
@@ -198,6 +156,7 @@ function addAuthentication (knex, email, accType, digest, cb)
             }
         });
 }
+
 /**
  * Kills timed out clients
  * @param {*} cb - function call on success
@@ -209,6 +168,8 @@ function LoginSweeper (knex, cb)
     var lastPlusSixty = lastCheckedTime + sixtyMinutes;
     var finishCnt = 0;
     
+    //forcably logs out all clients
+    //this occurs when no client has made a request in the past sixty minutes
     if (lastPlusSixty < curTime )
     {
         knex('faculty')
@@ -220,6 +181,9 @@ function LoginSweeper (knex, cb)
         lastCheckedTime = curTime;
         return;
     }
+    //forcably logs out any clients with the expire flag set to true
+    //sets all other account expire flags to true
+    //this occurs when the last time we checked the database for logins was over thirty minutes ago
     else if (lastPlusThirty < curTime)
     {
         knex('faculty')
@@ -254,6 +218,7 @@ function LoginSweeper (knex, cb)
         onTimerCheck();
     }
 
+    //calls the callback function passed in through function parameters
     function onTimerCheck()
     {
         if (finishCnt < 2)
@@ -263,67 +228,73 @@ function LoginSweeper (knex, cb)
 }
 
 /**
- * Validates digest
+ * Validates authorization code
  * @param {*} knex  - database handler
  * @param {*} req - request body
  * @param {*} cb - funct to call on success
  */
 function getRequestor (knex, req, cb)
 {
+    //hashes authorization code sent by client
     var authCode = req.body.authCode;
     var hash = crypto.createHash('sha256');
     hash.update(authCode, 'utf8');
     var digest = hash.digest('hex');
 
+    //Sweeps for inactive users in the database
     LoginSweeper(knex ,onSweep);
 
     function onSweep ()
     {
-        //console.log('Body:');
-        //console.log(req.body);
-        //console.log('Hash:');
-        //console.log(digest);
-
+        //Check faculty table for matching hash
         knex('faculty')
             .select()
             .where('digest', digest)
             .then((frows) => {
-                //console.log(frows);
                 if (frows.length > 0)
                 {
+                    //if match is found
                     var retObj = {
                         email: frows[0].email,
                         accType: frows[0].accType,
                         name: frows[0].name,
                         id: frows[0].id
                     };
+                    //calls back with information about the requestor
                     cb(retObj);
+                    //refreshes expiration since session is still valid.
                     knex('faculty')
                         .where('digest', digest)
-                        .update('expire', false) //refreshes expiration since session is still valid.
+                        .update('expire', false) 
                         .then(() => {});
                 }
                 else
                 {
+                    //if match is not found
+                    //check patient table for matching hash
                     knex('patients')
                         .select()
                         .where('digest', digest)
                         .then((prows) => {
                             if (prows.length > 0)
                             {
+                                //if match is found
                                 var retObj = {
                                     email: prows[0].email,
                                     accType: 'patient',
                                     patientID: prows[0].id
                                 };
+                                //calls back with information about the requestor
                                 cb(retObj);
+                                //refreshes expiration since session is still valid.
                                 knex('patients')
                                     .where('digest', digest)
-                                    .update('expire', false) //refreshes expiration since session is still valid.
+                                    .update('expire', false) 
                                     .then(() => {});
                             }
                             else
                             {
+                                //if no math is found, call back with an err
                                 cb({err: 'Invalid Auth Code'});
                             }
                         });
@@ -332,22 +303,29 @@ function getRequestor (knex, req, cb)
     }
 }
 
+//checks to make sure requestor is valid, then sets their hash digest to 'null'
 function revokeAuthentication (knex, req, res)
 {
+    //get information in request
     var email = req.body.email;
     var authCode = req.body.authCode;
     var accType = req.body.accType;
     validateAuthCode();
 
+    //validates the requestors authentication code
     function validateAuthCode ()
     {
+        //hash the authentication code
         var hash = crypto.createHash('sha256');
         hash.update(authCode, 'utf8');
         var digest = hash.digest('hex');
+
+        //sets the table to check
         var table = 'faculty';
         if (accType == 'patient')
             table = 'patients';
         
+        //checks table for matching hash
         knex(table)
             .select()
             .where({
@@ -355,18 +333,22 @@ function revokeAuthentication (knex, req, res)
                 digest: digest
             })
             .then((rows) => {
-                if (rows.length > 0)
+                if (rows.length > 0) //if match is found
                     validCB();
-                else
+                else //if no match is found, resond with err
                     util.respond(res, 401, JSON.stringify({err: 'Bad Credentials'}));
             });
     }
 
+    //sets the hash to 'null'
     function validCB ()
     {
+        //gets table to query
         var table = 'faculty';
         if (accType == 'patient')
             table = 'patients';
+        
+        //sets the hash to 'null'
         knex(table)
             .where('email', email)
             .update({'digest': 'null', 'expire': false})
@@ -376,6 +358,7 @@ function revokeAuthentication (knex, req, res)
     }
 }
 
+//checks to see if email exists in the database
 function checkEmail (knex, email, cb)
 {
     knex('faculty')
@@ -406,8 +389,8 @@ function checkEmail (knex, email, cb)
         });
 }
 
+//exported functions
 module.exports.exchangeAuthCode = exchangeAuthCode;
-
 module.exports.getAuthForToken = getAuthForToken;
 module.exports.revokeAuthentication = revokeAuthentication;
 module.exports.getRequestor = getRequestor;

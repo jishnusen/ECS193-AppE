@@ -10,6 +10,7 @@ resources:
 
 env_variables:
   NODE_ENV: production
+  #sql database connection variables
   SQL_USER: huhu
   SQL_PASSWORD: password
   SQL_DATABASE: ecs193_database
@@ -18,6 +19,7 @@ env_variables:
   CLIENT_ID: 671445578517-ogrl80hb1pnq5ruirarvjsmvd8th2hjp.apps.googleusercontent.com
   CLIENT_WEB_SECRET: K6gGjixzDWcT18inlGLnydQv
   CLIENT_ELEC_ID: 671445578517-io87npos82nmk6bk24ttgikc9h4uls4l.apps.googleusercontent.com
+  #MailJet api keys
   MAILJET_PUBLIC: 524c051f4fb254ae5636592655d92194
   MAILJET_PRIVATE: 0b74bf7ddd333cad1d75c2dd2570cd7a
 

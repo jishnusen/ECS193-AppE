@@ -256,26 +256,6 @@ function fetchReadingsSize (knex, req, res, ids)
 *   @param res  - the POST response
 **/
 
-/*
-function fetchReadingsLimited (knex, req, res)
-{
-    var data = req.body;
-    
-    knex
-        .select()
-        .from('patient_' + data.id)
-        .where('event', "reading")
-        .orderBy("timestamp", "asc")
-        .limit(1400) //assuming 4 readings every hour, 1344 readings in 14 days should be the upper limit assuming 1 reading every 15 minutes.
-        .then(function (results) {
-            var ret = {
-                csv: results
-            };
-            util.respond(res, 200, JSON.stringify(ret));
-        });
-}
-*/
-
 function fetchReadingsLimited (knex, req, res)
 {
     var data = req.body;
@@ -336,7 +316,7 @@ function fetchLeakAndVoidEvents(knex, req, res)
         .from('patient_' + data.id)
         .where('event', 'leak').orWhere('event', 'void')
         .orderBy("timestamp", "asc")
-        .limit(300) //A reasonable upper limit (normal bathroom 4~10 times, this is at least 30 days)
+        .limit(300) //A reasonable upper limit (normal bathroom 4~8 times, this is at least 30 days)
         .then(function (results) {
             var ret = {
                 csv: ''

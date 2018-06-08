@@ -8,22 +8,8 @@ const InsertRequestHandler = require('./InsertRequestHandler.js');
 const util = require('./util.js');
 const Authenticator = require('./Authenticator.js');
 
-var CLIENT_IDS = [];
-if (process.env.NODE_ENV != 'production')
-{
-    process.env.CLIENT_ID = '671445578517-ogrl80hb1pnq5ruirarvjsmvd8th2hjp.apps.googleusercontent.com';
-    process.env.CLIENT_ELEC_ID = '671445578517-io87npos82nmk6bk24ttgikc9h4uls4l.apps.googleusercontent.com';
-}
-CLIENT_IDS = [process.env.CLIENT_ID, process.env.CLIENT_ELEC_ID, process.env.CLIENT_EMAILER];
-
-var validationPairs = [];
-validationPairs.push('adminDoctor-admin');
-validationPairs.push('adminDoctor-doctor');
-validationPairs.push('adminDoctor-patient');
-validationPairs.push('admin-admin');
-validationPairs.push('admin-doctor');
-validationPairs.push('doctor-patient');
-
+//checks if an email exists within the database
+//calls 'cb' with true if exists, false otherwise
 function checkAccountExists (knex, email, cb)
 {
     knex('faculty')
@@ -50,6 +36,7 @@ function checkAccountExists (knex, email, cb)
         });
 }
 
+//checks if the email is in the verification table
 function checkActiveVerification (knex, to, cb)
 {
     knex('pendingVerification')
@@ -63,65 +50,80 @@ function checkActiveVerification (knex, to, cb)
         });
 }
 
+//sends an account activation link via mailjet
 function sendEmail (knex, req, res)
 {
     var body = req.body;
 
+    //hard setting api keys if running locally
     if (process.env.NODE_ENV != 'production')
     {
         process.env.MAILJET_PUBLIC = '524c051f4fb254ae5636592655d92194';
         process.env.MAILJET_PRIVATE = '0b74bf7ddd333cad1d75c2dd2570cd7a';
     }
 
+    //gathers information from request
     var newAccType = body.newAccType;
     var toEmail = body.recipientEmail;
     var toFamilyName = body.recipientFamilyName;
     var toGivenName = body.recipientGivenName;
     var fromEmail = '';
 
+    //checks if the account already exists
     checkAccountExists(knex, toEmail, accExistance);
 
     function accExistance (exists)
     {
+        //if the account exists
         if (exists)
         {
+            //respond with an err
             util.respond(res, 400, JSON.stringify({err: 'Account Already Exists for Email'}));
             return;
         }
+        //else get the requestors information
         Authenticator.getRequestor(knex, req, gotRequestor);
     }
 
     function gotRequestor (requestor)
     {
+        //if the requestor was not found in the database
         if (requestor.hasOwnProperty('err'))
         {
             util.respond(res, 401, JSON.stringify({err: 'Bad Auth'}));
             return;
         }
 
+        //if the requestor does not have admin priviledges
         var accType = requestor.accType;
-        var checkPair = accType + '-' + newAccType;
-        if (!validationPairs.includes(checkPair))
+        if (accType != 'admin' && accType != 'adminDoctor')
         {
+            //respond with an err
             util.respond(res, 400, JSON.stringify({err: 'Account type "' + accType + '" cannot add account type "' + newAccType + '"'}));
             return;
         }
 
+        //gets who is the request is parented to
         fromEmail = requestor.email;
         if (body.hasOwnProperty('doctorEmail'))
             fromEmail = body.doctorEmail;
 
+        //random alphnumeric sting for use in the verification link
         var randStr = randomstring.generate(64);
 
+        //updates the verification string in database if the 
         updateVerifyLink(randStr);
 
+        //the host of the activation link
         var host = 'https://majestic-legend-193620.appspot.com';
+        //var host = 'http://localhost:8080
 
+        //the email's object
         var mailData = {
             'Messages': [{
                 'From': {
-                    'Email': 'nicholas.michael.ng@gmail.com',
-                    'Name': 'Nicholas Ng'
+                    'Email': 'email@email.com', //change this to some mailjet verified email
+                    'Name': 'no-reply'
                 },
                 'To': [{
                     'Email': toEmail,
@@ -129,31 +131,34 @@ function sendEmail (knex, req, res)
                 }],
                 'Subject': 'Account Activation',
                 'TextPart': randStr,
+                //The body of the email in html
                 'HtmlPart': 'To activate your NIBVA account, click<a href="' + host + '/account/validate?v=' + randStr + '">here</a>.'
             }]   
         };
 
+        //mailjet connection
         var mailer = mailjet.connect(process.env.MAILJET_PUBLIC, process.env.MAILJET_PRIVATE);
 
+        //send the email
         var request = mailer.post('send', { 'version': 'v3.1' }).request(mailData);
         request
-            .then(function (result) {
-                //console.log(result.body);
+            .then(function (result) { //on success
                 util.respond(res, 200, JSON.stringify({body: 'EMAIL SENT'}));
             })
-            .catch(function (err) {
-                //console.log(err);
+            .catch(function (err) { //on failure
                 util.respond(res, 400, JSON.stringify({err: 'ERROR ON SEND'}));
             });
     }
 
+    //updates the verification string in the database if it exists
     function updateVerifyLink (str)
     {
+        //check for existance
         checkActiveVerification(knex, toEmail, activationExistance);
 
         function activationExistance (exists)
         {
-            if (exists)
+            if (exists) //if exists, update
             {
                 knex('pendingVerification')
                     .where('to', toEmail)
@@ -166,7 +171,7 @@ function sendEmail (knex, req, res)
                     })
                     .then(function() {});
             }
-            else
+            else //if not, create
             {
                 var data = {
                     code: str,
@@ -180,22 +185,27 @@ function sendEmail (knex, req, res)
                 knex('pendingVerification')
 					.insert(data)
 					.catch((err) => { console.log(err); })
-					.then(function() { /*console.log('Insert');*/ });
+					.then(function() {});
             }
         }
     }
 }
 
+//function called when verification link is visited
 function insertVerify (knex, req, res)
 {
+    //if malformed link
 	if (!req.query.hasOwnProperty('v'))
 	{
+        //respond with error
         util.respond(res, 400, JSON.stringify({err: 'Insert verification link form invalid.'}));
 		return;
 	}
     
+    //verification string
     var v = req.query.v;
 
+    //check for code inside of verification table
     knex
         .select()
         .from('pendingVerification')
@@ -209,13 +219,15 @@ function insertVerify (knex, req, res)
     
     function validCode (row)
     {
-        //console.log(row);
+        //if the code is inactive
         if (row.activeCode == 0)
         {
+            //respond with err
             util.respond(res, 400, JSON.stringify({err: 'Verification code invalid.'}));
             return;
         }
 
+        //update verification code to be '0'
         knex('pendingVerification')
             .where('to', row.to)
             .update('code', '0')
@@ -227,8 +239,10 @@ function insertVerify (knex, req, res)
         var familyName = row.familyName;
         var givenName = row.givenName;
 
+        //if making a staff account
         if (accType == 'adminDoctor' || accType == 'admin' || accType == 'doctor')
         {
+            //insert new account into faculty table
             var data = {
                 email: email,
                 familyName: familyName,
@@ -239,8 +253,10 @@ function insertVerify (knex, req, res)
             };
             InsertRequestHandler.insertFaculty(knex, data, res);
         }
+        //if making a patient account
         else if (accType == 'patient')
         {
+            //insert new account into patient table
             var data = {
                 email: email,
                 familyName: familyName,
@@ -255,12 +271,15 @@ function insertVerify (knex, req, res)
     }
 }
 
+//updates the accounts last login to be the current time
 function updateLastLogin (knex, requestor, res, respondFlag)
 {
+    //the table where to find the account
     var table = 'faculty';
     if (requestor.accType == 'patient')
         table = 'patients';
 
+    //formatting the date
     var date = new Date();
     var y = date.getUTCFullYear();
     var mo = date.getUTCMonth() + 1;
@@ -280,6 +299,7 @@ function updateLastLogin (knex, requestor, res, respondFlag)
         s = '0' + s;
     var time = y + '-' + mo + '-' + d + ' ' + h + ':' + mi + ':' + s;
     
+    //update the appropriate cell in the table
     knex(table)
         .where('email', requestor.email)
         .update('lastLogin', time)
@@ -288,6 +308,7 @@ function updateLastLogin (knex, requestor, res, respondFlag)
         });
 }
 
+//function exports
 module.exports.sendEmail = sendEmail;
 module.exports.insertVerify = insertVerify;
 module.exports.updateLastLogin = updateLastLogin;
